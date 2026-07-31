@@ -55,19 +55,25 @@ function readStored(): CartLine[] {
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   // Hydrate after mount so server and client markup match on first paint.
   useEffect(() => {
     setLines(readStored());
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
+    // Don't write until the stored cart has been read back in. Otherwise the
+    // empty initial state gets flushed to storage on mount and wipes a cart
+    // that another tab may be relying on.
+    if (!hydrated) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
     } catch {
       // Storage disabled (private mode / blocked) — cart stays in-memory.
     }
-  }, [lines]);
+  }, [lines, hydrated]);
 
   const add = useCallback((slug: string, size: string, qty = 1) => {
     setLines((prev) => {

@@ -19,6 +19,8 @@ export interface Product {
   estimated: boolean;
   scale: SizeScale;
   sizes: string[];
+  /** Pre-selected size used by the feed's one-tap ADD button. */
+  defaultSize: string;
   images: {
     primary: string;
     alternate: string;
@@ -36,7 +38,14 @@ const SIZES_BY_SCALE: Record<SizeScale, string[]> = {
   belt: BELT_SIZES,
 };
 
-type ProductSeed = Omit<Product, "id" | "sizes" | "images"> & {
+/** Middle-of-the-run size per scale — what ADD drops in without asking. */
+const DEFAULT_SIZE_BY_SCALE: Record<SizeScale, string> = {
+  apparel: "M",
+  footwear: "UK 9",
+  belt: '32"',
+};
+
+type ProductSeed = Omit<Product, "id" | "sizes" | "defaultSize" | "images"> & {
   sizes?: string[];
 };
 
@@ -155,6 +164,7 @@ export const products: Product[] = SEED.map((seed, i) => ({
   ...seed,
   id: String(i + 1).padStart(3, "0"),
   sizes: seed.sizes ?? SIZES_BY_SCALE[seed.scale],
+  defaultSize: DEFAULT_SIZE_BY_SCALE[seed.scale],
   images: {
     primary: `/products/${seed.slug}-1.jpg`,
     alternate: `/products/${seed.slug}-2.jpg`,

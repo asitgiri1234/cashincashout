@@ -190,3 +190,101 @@ video {
 .cico-rise {
   animation: cico-rise var(--dur-base) var(--ease-out-expo) both;
 }
+
+/* --------------------------------------------------------------------------
+   MARQUEE — seamless infinite horizontal scroll.
+
+   The track holds TWO identical groups laid side by side. Translating the
+   track by exactly -50% lands group B precisely where group A started, so the
+   loop restarts on an identical frame and there is no visible seam.
+
+   Pure CSS by design — no JS ticker, no rAF, runs on the compositor.
+   -------------------------------------------------------------------------- */
+
+@keyframes cico-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.marquee {
+  overflow: hidden;
+  width: 100%;
+  /* Contain paint so the offscreen half never costs anything. */
+  contain: paint;
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: cico-marquee var(--marquee-duration, 24s) linear infinite;
+  /* Paused until the panel becomes active — set via .is-paused. */
+}
+
+.marquee__track.is-paused {
+  animation-play-state: paused;
+}
+
+.marquee__group {
+  display: flex;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No scrolling text at all — the title sits still and only the first group
+     is rendered (the duplicate is hidden below). */
+  .marquee__track {
+    animation: none;
+    transform: none;
+  }
+  .marquee__group[data-clone="true"] {
+    display: none;
+  }
+  .marquee {
+    /* Long titles would otherwise be clipped with no way to read them. */
+    overflow-x: auto;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   FEED — full-viewport vertical snap scroller.
+
+   100dvh, NOT 100vh: mobile browser chrome collapses on scroll and 100vh
+   leaves a gap / causes a jump. dvh tracks the real viewport.
+   -------------------------------------------------------------------------- */
+
+.feed {
+  height: 100dvh;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  /* The feed owns the whole gesture. The footer is a snap section INSIDE the
+     scroller, so nothing below needs to be reachable by chaining — and
+     chaining would drag the page behind the panels mid-scroll. */
+  overscroll-behavior-y: contain;
+  /* Scrollbar hidden here only — the progress rail is the position indicator. */
+  scrollbar-width: none;
+}
+
+.feed::-webkit-scrollbar {
+  display: none;
+}
+
+.feed__panel--outro {
+  /* No photography here — sit on the page background, not the image scrim. */
+  background: var(--bg);
+}
+
+.feed__panel {
+  height: 100dvh;
+  /* Panels outside the render window have no image mounted — this stops a
+     flash of page background during a fast fling. */
+  background: var(--surface);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  position: relative;
+  overflow: hidden;
+}

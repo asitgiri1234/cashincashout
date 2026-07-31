@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { fontVariables } from "@/lib/fonts";
 import { CartProvider } from "@/components/cart-context";
 import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
 import { CookieBar } from "@/components/cookie-bar";
 import { BadgeSlot } from "@/components/badge-slot";
 import "./globals.css";
@@ -22,21 +21,24 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
+/**
+ * Root layout — header, cookie bar, badge slot and cart state only.
+ *
+ * NOTE: the footer and the header top-offset deliberately live in the route
+ * groups below this, not here. The homepage feed is a full-viewport snap
+ * scroller that owns the entire screen and renders the footer as its own
+ * final snap section; a footer in the root layout would bleed into the feed
+ * mid-scroll. Ordinary content pages get both from `app/(pages)/layout.tsx`.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={fontVariables}>
-      <body className="flex min-h-screen flex-col bg-bg text-text antialiased">
+      <body className="bg-bg text-text antialiased">
         <CartProvider>
           <SiteHeader />
-
-          {/* Header is fixed and overlays content — offset the flow. */}
-          <main className="flex-1" style={{ paddingTop: "var(--header-h)" }}>
-            {children}
-          </main>
-
-          <SiteFooter />
+          {children}
           <CookieBar />
 
           {/* Reserved bottom-right badge slot — see components/badge-slot.tsx */}

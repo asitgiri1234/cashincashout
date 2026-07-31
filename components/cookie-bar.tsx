@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Cookie consent bar — bottom-left, dismissible, choice persisted to
@@ -12,8 +12,8 @@ const STORAGE_KEY = "cico.cookie-consent.v1";
 type Consent = "accepted" | "declined";
 
 export function CookieBar() {
-  // null = not yet checked; false = no stored choice, show the bar.
   const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
     try {
@@ -24,6 +24,34 @@ export function CookieBar() {
       setVisible(true);
     }
   }, []);
+
+  // Publish the bar's height as `--consent-h` so bottom-anchored UI can lift
+  // clear of it. Without this the bar sits directly on top of the feed's
+  // ADD / CHOOSE buttons and blocks the primary action until dismissed.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!visible) {
+      root.style.removeProperty("--consent-h");
+      return;
+    }
+
+    const el = ref.current;
+    if (!el) return;
+
+    // height + 20px bottom inset + 16px breathing room, so lifted controls
+    // clear the bar instead of resting flush against its top edge.
+    const publish = () =>
+      root.style.setProperty("--consent-h", `${el.offsetHeight + 36}px`);
+
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--consent-h");
+    };
+  }, [visible]);
 
   function choose(consent: Consent) {
     try {
@@ -38,7 +66,10 @@ export function CookieBar() {
 
   return (
     <aside
-      role="dialog"
+      ref={ref}
+      // Deliberately a region, not a dialog: it's persistent and non-modal,
+      // and the size-picker sheet is the page's only real dialog.
+      role="region"
       aria-live="polite"
       aria-label="Cookie consent"
       className="cico-rise fixed bottom-5 left-5 z-40 max-w-[min(380px,calc(100vw-2.5rem))] border border-border bg-surface p-4"
