@@ -30,11 +30,15 @@ export function SiteHeader() {
       className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-bg/55 backdrop-blur-md backdrop-saturate-150"
       style={{ height: "var(--header-h)" }}
     >
-      <div className="mx-auto flex h-full max-w-[1800px] items-center justify-between px-5 md:px-8">
+      {/* Three tracks with equal 1fr flanks, so the auto-width wordmark lands
+          dead centre while the actions stay hard right. */}
+      <div className="mx-auto grid h-full max-w-[1800px] grid-cols-[1fr_auto_1fr] items-center px-5 md:px-8">
+        <span aria-hidden="true" />
+
         <Link
           href="/"
           aria-label="CASH IN CASH OUT — home"
-          className="transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] hover:opacity-60"
+          className="justify-self-center transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] hover:opacity-60"
         >
           {/* AVIF first, PNG fallback for browsers without AVIF support. */}
           <picture>
@@ -50,7 +54,7 @@ export function SiteHeader() {
           </picture>
         </Link>
 
-        <div className="flex items-center gap-4 md:gap-6">
+        <div className="flex items-center gap-4 justify-self-end md:gap-6">
           <button
             type="button"
             onClick={() => openSearch(true)}

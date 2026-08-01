@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { useCallback } from "react";
 import type { Product } from "@/lib/products";
-import { formatPrice } from "@/lib/products";
 import { TransitionLink } from "@/components/view-transitions";
 
 /**
@@ -69,17 +68,11 @@ export function ProductGrid({ products }: { products: Product[] }) {
                 </div>
               </div>
 
-              <div className="mt-4 flex items-start justify-between gap-3">
-                <h2 className="text-[12px] leading-tight md:text-[13px]">
-                  {product.title}
-                </h2>
-                <p className="meta shrink-0 text-right text-[11px] text-text/70">
-                  {formatPrice(product.price)}
-                  {product.estimated && (
-                    <span className="block text-[9px]">EST</span>
-                  )}
-                </p>
-              </div>
+              {/* Name only. Pricing lives on the product page — the grid
+                  stays as quiet as the reference. */}
+              <h2 className="mt-4 text-center text-[12px] leading-tight md:text-[13px]">
+                {product.title}
+              </h2>
             </TransitionLink>
           </li>
         ))}

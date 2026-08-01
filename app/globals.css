@@ -23,7 +23,10 @@
 
   /* --- LAYOUT --------------------------------------------------------- */
   --header-h: 72px;
-  --logo-h: 36px;
+  /* 36px is the brand size, but the wordmark is ~7.5x as wide as it is tall.
+     Centred, a 36px logo is 270px across and collides with the header
+     actions on a phone — so it scales down on narrow viewports only. */
+  --logo-h: clamp(22px, 5.6vw, 36px);
 
   /* Footprint of the fixed bottom-right rotating brand badge.
      Anything fixed to the bottom of the viewport must stay clear of this. */
