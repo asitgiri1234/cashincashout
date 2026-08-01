@@ -85,8 +85,9 @@ export function FeedPanel({
               className="object-cover transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-0"
             />
             {/* Alternate view crossfades in on hover, 200ms. Only mounted for
-                the active panel — the others can't be hovered anyway. */}
-            {isActive && (
+                the active panel — the others can't be hovered anyway, and
+                only when a second photo exists (some products ship with one). */}
+            {isActive && product.images[1] && (
               <Image
                 src={product.images[1]}
                 alt=""

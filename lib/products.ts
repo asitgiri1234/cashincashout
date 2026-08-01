@@ -94,6 +94,8 @@ const SEED: ProductSeed[] = [
     estimated: true,
     scale: "apparel",
     soldOut: ["S"],
+    // Real photography: camo face only. The raw denim reverse isn't shot yet.
+    imageCount: 1,
     description:
       "Panelled work shirt splitting green camo against 14oz brown raw denim. Boxy through the body, unwashed.",
   },
@@ -103,6 +105,8 @@ const SEED: ProductSeed[] = [
     price: 5299,
     estimated: true,
     scale: "apparel",
+    // Real photography: camo face only. The raw denim reverse isn't shot yet.
+    imageCount: 1,
     description:
       "The earth colourway of the panelled work shirt. Brown camo against grey raw denim, unwashed selvedge.",
   },

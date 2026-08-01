@@ -33,13 +33,16 @@ export function MoreStrip({ current }: { current: Product }) {
                 sizes="280px"
                 className="object-cover transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-0"
               />
-              <Image
-                src={p.images[1]}
-                alt=""
-                fill
-                sizes="280px"
-                className="object-cover opacity-0 transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-100"
-              />
+              {/* Only products with a second photo get the hover crossfade. */}
+              {p.images[1] && (
+                <Image
+                  src={p.images[1]}
+                  alt=""
+                  fill
+                  sizes="280px"
+                  className="object-cover opacity-0 transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-100"
+                />
+              )}
             </div>
             <div className="flex items-start justify-between gap-2 pt-3">
               <h3 className="text-[12px] leading-tight">{p.title}</h3>
