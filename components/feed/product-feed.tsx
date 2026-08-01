@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Product } from "@/lib/products";
-import { useCart } from "@/components/cart-context";
+import { useCartStore } from "@/lib/cart-store";
 import { SiteFooter } from "@/components/site-footer";
 import { FeedPanel } from "./feed-panel";
 import { EntryOverlay } from "./entry-overlay";
@@ -13,7 +13,7 @@ import { SizeSheet } from "./size-sheet";
 const RENDER_WINDOW = 2;
 
 export function ProductFeed({ products }: { products: Product[] }) {
-  const { add } = useCart();
+  const add = useCartStore((s) => s.add);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const panelsRef = useRef<(HTMLElement | null)[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);

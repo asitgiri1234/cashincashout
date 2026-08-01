@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Product } from "@/lib/products";
 import { formatPrice } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
+import { useFocusTrap } from "@/components/use-focus-trap";
 import { EASE_OUT_EXPO } from "./motion-tokens";
 
 interface SizeSheetProps {
@@ -21,6 +22,7 @@ export function SizeSheet({ product, onClose, onConfirm }: SizeSheetProps) {
 
   // Hide the rotating badge while the sheet is up — it shares this corner.
   useOverlayLock("size-sheet", product !== null);
+  useFocusTrap(panelRef, product !== null);
 
   // Reset the choice each time a different product opens the sheet.
   useEffect(() => {
@@ -38,7 +40,6 @@ export function SizeSheet({ product, onClose, onConfirm }: SizeSheetProps) {
       }
     }
     window.addEventListener("keydown", onKey);
-    panelRef.current?.focus();
     return () => window.removeEventListener("keydown", onKey);
   }, [product, onClose]);
 

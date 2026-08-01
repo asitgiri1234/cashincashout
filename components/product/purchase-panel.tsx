@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { Product } from "@/lib/products";
 import { formatPrice } from "@/lib/products";
-import { useCart } from "@/components/cart-context";
+import { useCartStore } from "@/lib/cart-store";
 import { SizeChartModal } from "./size-chart-modal";
 
 /**
@@ -13,7 +13,7 @@ import { SizeChartModal } from "./size-chart-modal";
  * ADD TO CART button has scrolled out of the viewport.
  */
 export function PurchasePanel({ product }: { product: Product }) {
-  const { add } = useCart();
+  const add = useCartStore((s) => s.add);
   const [size, setSize] = useState(product.defaultSize);
   const [qty, setQty] = useState(1);
   const [chartOpen, setChartOpen] = useState(false);

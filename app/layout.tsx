@@ -1,21 +1,41 @@
 import type { Metadata, Viewport } from "next";
 import { fontVariables } from "@/lib/fonts";
-import { CartProvider } from "@/components/cart-context";
 import { OverlayProvider } from "@/components/ui-overlay-context";
 import { ViewTransitionProvider } from "@/components/view-transitions";
 import { SiteHeader } from "@/components/site-header";
 import { CookieBar } from "@/components/cookie-bar";
 import { BadgeSlot } from "@/components/badge-slot";
+import { CartDrawer } from "@/components/cart/cart-drawer";
+import { SearchOverlay } from "@/components/search-overlay";
 import "./globals.css";
 
+const description =
+  "CASH IN CASH OUT — industrial streetwear. Raw denim, camo splices, reclaimed hardware.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
   title: {
-    default: "CASH IN CASH OUT",
+    default: "CICO",
     template: "%s — CICO",
   },
-  description:
-    "CASH IN CASH OUT — industrial streetwear. Raw denim, camo splices, reclaimed hardware.",
+  description,
   applicationName: "CICO",
+  openGraph: {
+    siteName: "CICO",
+    title: "CICO — CASH IN CASH OUT",
+    description,
+    type: "website",
+    // White wordmark on transparent — the dark og-image card carries it.
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "CASH IN CASH OUT" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CICO — CASH IN CASH OUT",
+    description,
+    images: ["/og.png"],
+  },
 };
 
 export const viewport: Viewport = {
@@ -24,7 +44,7 @@ export const viewport: Viewport = {
 };
 
 /**
- * Root layout — header, cookie bar, badge slot and cart state only.
+ * Root layout — header, overlays, cookie bar and badge only.
  *
  * NOTE: the footer and the header top-offset deliberately live in the route
  * groups below this, not here. The homepage feed is a full-viewport snap
@@ -38,20 +58,20 @@ export default function RootLayout({
   return (
     <html lang="en" className={fontVariables}>
       <body className="bg-bg text-text antialiased">
-        <CartProvider>
-          <OverlayProvider>
-            {/* Must live above the routed children: it parks the pending
-                view-transition resolver across the navigation. */}
-            <ViewTransitionProvider>
-              <SiteHeader />
-              {children}
-              <CookieBar />
+        <OverlayProvider>
+          {/* Must live above the routed children: it parks the pending
+              view-transition resolver across the navigation. */}
+          <ViewTransitionProvider>
+            <SiteHeader />
+            {children}
+            <CookieBar />
+            <CartDrawer />
+            <SearchOverlay />
 
-              {/* Fixed bottom-right badge — see components/badge-slot.tsx */}
-              <BadgeSlot />
-            </ViewTransitionProvider>
-          </OverlayProvider>
-        </CartProvider>
+            {/* Fixed bottom-right badge — see components/badge-slot.tsx */}
+            <BadgeSlot />
+          </ViewTransitionProvider>
+        </OverlayProvider>
       </body>
     </html>
   );

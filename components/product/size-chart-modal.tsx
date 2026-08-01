@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SIZE_CHARTS, type SizeScale } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
+import { useFocusTrap } from "@/components/use-focus-trap";
 import { DUR_BASE, EASE_OUT_EXPO } from "@/components/feed/motion-tokens";
 
 export function SizeChartModal({
@@ -17,8 +18,10 @@ export function SizeChartModal({
 }) {
   const reduced = useReducedMotion();
   const chart = SIZE_CHARTS[scale];
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useOverlayLock("size-chart", open);
+  useFocusTrap(panelRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +48,7 @@ export function SizeChartModal({
           />
 
           <motion.div
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-label="Size chart"

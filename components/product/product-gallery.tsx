@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Product } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
+import { useFocusTrap } from "@/components/use-focus-trap";
 import { DUR_FAST, EASE_OUT_EXPO } from "@/components/feed/motion-tokens";
 
 /**
@@ -51,7 +52,7 @@ export function ProductGallery({ product }: { product: Product }) {
             >
               <Image
                 src={src}
-                alt={i === 0 ? product.title : ""}
+                alt={i === 0 ? product.title : `${product.title} — alternate view`}
                 fill
                 priority={i === 0}
                 sizes="100vw"
@@ -102,7 +103,7 @@ export function ProductGallery({ product }: { product: Product }) {
           >
             <Image
               src={src}
-              alt={i === 0 ? product.title : ""}
+              alt={i === 0 ? product.title : `${product.title} — alternate view`}
               fill
               priority={i === 0}
               sizes="60vw"
@@ -149,8 +150,10 @@ function Lightbox({
   const reduced = useReducedMotion();
   const open = index !== null;
   const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
   useOverlayLock("lightbox", open);
+  useFocusTrap(boxRef, open);
 
   // Reset zoom whenever the image changes or the lightbox reopens.
   useEffect(() => {
@@ -179,6 +182,7 @@ function Lightbox({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={boxRef}
           role="dialog"
           aria-modal="true"
           aria-label={`${title} — image ${(index ?? 0) + 1} of ${images.length}`}

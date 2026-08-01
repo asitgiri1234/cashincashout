@@ -75,7 +75,7 @@ export function FeedPanel({
           <>
             <Image
               src={product.images.primary}
-              alt=""
+              alt={product.title}
               fill
               // First panel is the LCP element. Everything else keeps
               // next/image's default lazy loading — don't pass `loading`

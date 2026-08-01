@@ -2,12 +2,34 @@
 
 Frontend-only storefront demo. **No backend, no real checkout.**
 
-Next.js 15 (App Router) · TypeScript · Tailwind CSS v4
+Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · Framer Motion · Zustand
+
+## Setup
 
 ```bash
 npm install
-npm run dev
+npm run dev        # http://localhost:3000
+npm run build      # production build (all routes prerender)
+npm start          # serve the production build
 ```
+
+No environment variables are required. `NEXT_PUBLIC_SITE_URL` may be set to
+the deployed origin so Open Graph URLs resolve absolutely; it defaults to
+localhost.
+
+## What is demo-only
+
+- **Checkout** — the cart drawer's button is permanently disabled and
+  labelled "CHECKOUT — DEMO ONLY". Nothing is ever charged or ordered.
+- **Cart** — Zustand state persisted to your own browser's localStorage
+  (`cico.cart.v2`). No server ever sees it.
+- **Search** — live client-side filtering over the local catalog in
+  [`lib/products.ts`](lib/products.ts). No search backend.
+- **Product data & imagery** — hardcoded catalog, generated placeholder
+  JPEGs. Prices flagged `EST` are placeholders.
+- **Policy pages** — placeholder copy, not legal text.
+- **Cookie bar** — records your choice locally; there is no tracking to
+  consent to.
 
 ---
 
@@ -127,7 +149,9 @@ and the header offset from [`app/(pages)/layout.tsx`](<app/(pages)/layout.tsx>)
 | Header         | [`components/site-header.tsx`](components/site-header.tsx)   | Fixed, 36px logo → `/`, cart count. No nav menu. |
 | Footer         | [`components/site-footer.tsx`](components/site-footer.tsx)   | Policy links + `© 2026 CICO`                     |
 | Cookie bar     | [`components/cookie-bar.tsx`](components/cookie-bar.tsx)     | Accept / Decline, persisted to `localStorage`    |
-| Cart state     | [`components/cart-context.tsx`](components/cart-context.tsx) | In-memory + `localStorage`, demo only            |
+| Cart state     | [`lib/cart-store.ts`](lib/cart-store.ts)                     | Zustand + persist middleware, demo only          |
+| Cart drawer    | [`components/cart/cart-drawer.tsx`](components/cart/cart-drawer.tsx) | Right slide-in, animated line items      |
+| Search         | [`components/search-overlay.tsx`](components/search-overlay.tsx) | Full-screen, live local filtering            |
 | Brand badge    | [`components/brand-badge.tsx`](components/brand-badge.tsx)   | Rotating circular-text badge — see below         |
 
 ### Rotating brand badge
@@ -241,12 +265,36 @@ every Tailwind utility regardless of source order — which silently disabled
 `bg-*`/`text-*`/`border-*` on buttons site-wide (inverted buttons rendered
 transparent). If you add element-level CSS, put it in `@layer base`.
 
-## Not built yet
+## Overlays & accessibility
 
-- Cart page (`/cart` is linked from the header)
-- Policy pages (footer links are placeholders)
+- **Cart drawer**: slides from the right (400ms, `--ease-out-expo`) over a
+  blurred backdrop. Line items carry thumbnail / title / size / quantity
+  stepper / remove, and animate out on removal — the list stays mounted at
+  zero items so the last row's exit still plays before the empty state fades
+  in. Subtotal in mono, disabled "CHECKOUT — DEMO ONLY", empty state links
+  back to the feed. The header count re-keys and springs on every change.
+- **Search overlay**: full-screen from the header icon, input auto-focused,
+  live filtering by title/slug/SKU, thumbnail + title + price rows, empty
+  state, closes on Escape / backdrop click / navigation.
+- **Focus management**: [`components/use-focus-trap.ts`](components/use-focus-trap.ts)
+  traps Tab inside the cart drawer, search overlay, size sheet, size chart
+  and lightbox, and returns focus on close. Every interactive element shows
+  the global square `:focus-visible` outline.
+- **Overlay registry**: all of the above register with
+  [`components/ui-overlay-context.tsx`](components/ui-overlay-context.tsx),
+  which hides the rotating badge while anything blocking is open.
+- All product images carry meaningful `alt` text; repeated decorative
+  duplicates (hover-crossfade second copies) use empty alt by design.
+- `prefers-reduced-motion` collapses every slide/zoom/spin to opacity fades;
+  verified end-to-end in the test suites.
 
-Until those exist, Next's `<Link>` prefetch logs a 404 per missing route in the
-console. Harmless, and it clears itself as the pages get built.
+## Stub pages & metadata
+
+- `app/not-found.tsx` — 404 with a link back to the feed.
+- `/privacy`, `/terms`, `/refund`, `/shipping`, `/contact` — placeholder
+  stubs via [`components/policy-page.tsx`](components/policy-page.tsx).
+- Title "CICO" (template `%s — CICO`), Open Graph + Twitter cards using
+  `public/og.png`, favicon at `app/icon.png` — both generated from the
+  wordmark on the brand black.
 
 New pages go in `app/(pages)/` so they pick up the header offset and footer.
