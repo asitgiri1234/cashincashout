@@ -105,8 +105,8 @@ const SEED: ProductSeed[] = [
     price: 5299,
     estimated: true,
     scale: "apparel",
-    // Real photography: camo face only. The raw denim reverse isn't shot yet.
-    imageCount: 1,
+    // Real photography: camo face + the raw denim reverse.
+    imageCount: 2,
     description:
       "The earth colourway of the panelled work shirt. Brown camo against grey raw denim, unwashed selvedge.",
   },
