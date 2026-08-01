@@ -27,14 +27,14 @@ export function MoreStrip({ current }: { current: Product }) {
           >
             <div className="relative aspect-4/5 overflow-hidden bg-surface">
               <Image
-                src={p.images.primary}
+                src={p.images[0]}
                 alt={p.title}
                 fill
                 sizes="280px"
                 className="object-cover transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-0"
               />
               <Image
-                src={p.images.alternate}
+                src={p.images[1]}
                 alt=""
                 fill
                 sizes="280px"

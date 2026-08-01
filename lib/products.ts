@@ -23,10 +23,13 @@ export interface Product {
   soldOut: string[];
   /** Pre-selected size used by the feed's one-tap ADD button. */
   defaultSize: string;
-  images: {
-    primary: string;
-    alternate: string;
-  };
+  /**
+   * Gallery images in display order. Always at least two: [0] is the hero
+   * (feed panel, thumbnails, view-transition morph target) and [1] is the
+   * alternate shown on hover. Products with real photography may carry more,
+   * and the product page renders the whole array.
+   */
+  images: string[];
   description: string;
 }
 
@@ -53,6 +56,12 @@ type ProductSeed = Omit<
 > & {
   sizes?: string[];
   soldOut?: string[];
+  /**
+   * How many photos exist for this product. Defaults to 2 (the placeholder
+   * pair). Bump it as real photography lands: files are expected at
+   * /products/{slug}-1.jpg … -{imageCount}.jpg.
+   */
+  imageCount?: number;
 };
 
 const SEED: ProductSeed[] = [
@@ -63,6 +72,8 @@ const SEED: ProductSeed[] = [
     estimated: false,
     scale: "footwear",
     soldOut: ["UK 6", "UK 11"],
+    // Real product photography: 3/4 pair, side profile, heel detail.
+    imageCount: 3,
     description:
       "Full-grain upper on a blown rubber lug sole. Goodyear-welted, unlined, built to deform around the wearer.",
   },
@@ -183,10 +194,10 @@ export const products: Product[] = SEED.map((seed, i) => {
     defaultSize: soldOut.includes(preferred)
       ? (sizes.find((s) => !soldOut.includes(s)) ?? preferred)
       : preferred,
-    images: {
-      primary: `/products/${seed.slug}-1.jpg`,
-      alternate: `/products/${seed.slug}-2.jpg`,
-    },
+    images: Array.from(
+      { length: seed.imageCount ?? 2 },
+      (_, n) => `/products/${seed.slug}-${n + 1}.jpg`,
+    ),
   };
 });
 

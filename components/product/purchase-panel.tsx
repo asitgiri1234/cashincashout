@@ -158,7 +158,7 @@ export function PurchasePanel({ product }: { product: Product }) {
         <div className="mx-auto flex h-full max-w-[1800px] items-center gap-3 px-5 md:px-8">
           <div className="relative h-10 w-8 shrink-0 bg-surface">
             <Image
-              src={product.images.primary}
+              src={product.images[0]}
               alt=""
               fill
               sizes="32px"

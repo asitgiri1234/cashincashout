@@ -116,7 +116,7 @@ export function SearchOverlay() {
                       >
                         <div className="relative h-14 w-11 shrink-0 bg-surface">
                           <Image
-                            src={p.images.primary}
+                            src={p.images[0]}
                             alt={p.title}
                             fill
                             sizes="44px"

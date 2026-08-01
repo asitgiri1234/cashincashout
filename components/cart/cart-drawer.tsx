@@ -167,7 +167,7 @@ function CartRow({ line }: { line: CartLine }) {
       <div className="flex gap-3 py-4">
         <div className="relative h-20 w-16 shrink-0 bg-surface">
           <Image
-            src={product.images.primary}
+            src={product.images[0]}
             alt={product.title}
             fill
             sizes="64px"

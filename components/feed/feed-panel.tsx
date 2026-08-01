@@ -74,7 +74,7 @@ export function FeedPanel({
         {shouldRenderImage && (
           <>
             <Image
-              src={product.images.primary}
+              src={product.images[0]}
               alt={product.title}
               fill
               // First panel is the LCP element. Everything else keeps
@@ -88,7 +88,7 @@ export function FeedPanel({
                 the active panel — the others can't be hovered anyway. */}
             {isActive && (
               <Image
-                src={product.images.alternate}
+                src={product.images[1]}
                 alt=""
                 fill
                 sizes="100vw"

@@ -20,7 +20,7 @@ import { DUR_FAST, EASE_OUT_EXPO } from "@/components/feed/motion-tokens";
  * active feed panel, so navigating feed -> product morphs the image.
  */
 export function ProductGallery({ product }: { product: Product }) {
-  const images = [product.images.primary, product.images.alternate];
+  const images = product.images;
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [mobileIndex, setMobileIndex] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
