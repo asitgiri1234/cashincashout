@@ -111,6 +111,18 @@ const SEED: ProductSeed[] = [
       "The earth colourway of the panelled work shirt. Brown camo against grey raw denim, unwashed selvedge.",
   },
   {
+    slug: "camo-raw-denim-jacket",
+    title: "CAMO // RAW DENIM JACKET",
+    // PLACEHOLDER PRICE — invented for the demo, hence EST. Set the real one.
+    price: 6499,
+    estimated: true,
+    scale: "apparel",
+    // Two colourways shot: green camo / grey denim, and brown camo / brown.
+    imageCount: 2,
+    description:
+      "Zip-through camo jacket, reversible to raw denim. Cropped and boxy with a raw-cut hem and cuff, brass hardware.",
+  },
+  {
     slug: "green-camo-brown-raw-denim-jorts",
     title: "GREEN CAMO // BROWN RAW DENIM JORTS",
     price: 4699,
@@ -198,6 +210,7 @@ const LIVE_SLUGS = [
   "raw-tire-belt",
   "green-camo-brown-raw-denim-shirt",
   "brown-camo-grey-raw-denim-shirt",
+  "camo-raw-denim-jacket",
   "brown-camo-grey-raw-denim-jorts",
 ];
 
