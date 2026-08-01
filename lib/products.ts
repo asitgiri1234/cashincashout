@@ -181,7 +181,27 @@ const SEED: ProductSeed[] = [
   },
 ];
 
-export const products: Product[] = SEED.map((seed, i) => {
+/**
+ * DEMO SCOPE — the storefront currently runs a short edit of the catalog.
+ *
+ * Everything else stays in SEED above, parked, until its photography lands.
+ * Putting a product back on the site is one line here; the order of this list
+ * is the order of the feed. Parked products are absent from `products`, so
+ * they get no route, no search hit and no feed panel.
+ */
+const LIVE_SLUGS = [
+  "boots",
+  "raw-tire-belt",
+  "green-camo-brown-raw-denim-shirt",
+  "brown-camo-grey-raw-denim-shirt",
+  "brown-camo-grey-raw-denim-jorts",
+];
+
+export const products: Product[] = LIVE_SLUGS.map((slug) => {
+  const seed = SEED.find((s) => s.slug === slug);
+  if (!seed) throw new Error(`LIVE_SLUGS references unknown product: ${slug}`);
+  return seed;
+}).map((seed, i) => {
   const sizes = seed.sizes ?? SIZES_BY_SCALE[seed.scale];
   const soldOut = seed.soldOut ?? [];
   const preferred = DEFAULT_SIZE_BY_SCALE[seed.scale];
