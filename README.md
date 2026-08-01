@@ -202,6 +202,45 @@ generated placeholders — swap them for real photography.
 
 ---
 
+## Product pages
+
+`/product/[slug]` — statically generated for all 12 products from the catalog.
+Components live in [`components/product/`](components/product/).
+
+- **Layout**: gallery left at 60% / info right at 40% on desktop, with the info
+  column sticky. Mobile stacks gallery over info.
+- **Gallery** (`product-gallery.tsx`): vertical image stack on desktop, snap
+  carousel with dot indicators on mobile, and a full-screen lightbox with
+  click-point 2× zoom. The first image carries
+  `view-transition-name: product-media` (mobile and desktop copies are never
+  painted together, so the name stays unique).
+- **Purchase panel** (`purchase-panel.tsx`): square size buttons — selected
+  state inverted, sold-out struck-through and disabled (`soldOut` in the
+  catalog; `defaultSize` never resolves to a sold-out size) — a − / value / +
+  quantity stepper, and a full-width inverted ADD TO CART with a `.btn-press`
+  press state. "📏 SIZE CHART" opens a modal rendering the monospace
+  measurement tables from `SIZE_CHARTS` in [`lib/products.ts`](lib/products.ts).
+- **Sticky mini-bar**: slides down from under the header (400ms,
+  `--ease-out-expo`) once the main ADD TO CART passes above the header line,
+  and hides on scroll-back. The trigger observes the button against a viewport
+  whose bottom edge is extended ~infinitely (`rootMargin: "-72px 0px 100000px
+  0px"`), for two reasons: below-the-fold still counts as "not passed yet",
+  and a fast fling that jumps the button across the viewport between frames
+  still fires the observer — with a plain viewport root it goes
+  not-intersecting → not-intersecting and the bar strands. Note the desktop
+  info column is sticky, so the bar only engages once scrolling continues past
+  it (into MORE); on mobile it does the heavy lifting.
+- **MORE** (`more-strip.tsx`): the next four products in catalog order as a
+  horizontal scroll strip with hover crossfade.
+
+### A cascade-layer gotcha (fixed, don't reintroduce)
+
+Element baselines in `globals.css` (`button { background: none }`, `a { color:
+inherit }`, …) MUST stay inside `@layer base`. Un-layered element rules beat
+every Tailwind utility regardless of source order — which silently disabled
+`bg-*`/`text-*`/`border-*` on buttons site-wide (inverted buttons rendered
+transparent). If you add element-level CSS, put it in `@layer base`.
+
 ## Not built yet
 
 - Cart page (`/cart` is linked from the header)
@@ -211,5 +250,3 @@ Until those exist, Next's `<Link>` prefetch logs a 404 per missing route in the
 console. Harmless, and it clears itself as the pages get built.
 
 New pages go in `app/(pages)/` so they pick up the header offset and footer.
-Product pages exist at `/product/[slug]`, statically generated from the
-catalog.

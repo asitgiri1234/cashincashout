@@ -75,67 +75,74 @@
   border-radius: 0 !important;
 }
 
-html {
-  background: var(--bg);
-  color-scheme: dark;
-  -webkit-text-size-adjust: 100%;
+/* Element baselines live in @layer base ON PURPOSE. Tailwind's utilities
+   layer must be able to override them — un-layered element rules would beat
+   every layered utility (bg-*, text-*, border-*) no matter the order, which
+   silently kills inverted buttons and link colours across the site. */
+@layer base {
+  html {
+    background: var(--bg);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display), "Arial Narrow", system-ui, sans-serif;
+    font-stretch: 88%; /* condensed */
+    font-synthesis-weight: none;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 0.95;
+    text-wrap: balance;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  img,
+  picture,
+  svg,
+  video {
+    display: block;
+    max-width: 100%;
+  }
 }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-display), "Arial Narrow", system-ui, sans-serif;
-  font-stretch: 88%; /* condensed */
-  font-synthesis-weight: none;
-  text-transform: uppercase;
-  letter-spacing: -0.01em;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  letter-spacing: -0.02em;
-  font-weight: 600;
-  line-height: 0.95;
-  text-wrap: balance;
-}
-
-/* Prices, sizes, SKUs, counters. */
+/* Prices, sizes, SKUs, counters. Un-layered class is fine — it only sets
+   font properties that no colour/background utility competes with. */
 .meta {
   font-family: var(--font-meta), ui-monospace, monospace;
   font-stretch: normal;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  text-transform: inherit;
-  letter-spacing: inherit;
-  color: inherit;
-  background: none;
-  border: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-img,
-picture,
-svg,
-video {
-  display: block;
-  max-width: 100%;
 }
 
 /* --------------------------------------------------------------------------
@@ -359,6 +366,81 @@ textarea {
 }
 
 .feed::-webkit-scrollbar {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   BUTTON PRESS — a satisfying push-in on the primary CTAs.
+   -------------------------------------------------------------------------- */
+
+.btn-press {
+  transition:
+    transform 80ms var(--ease-out-expo),
+    opacity var(--dur-fast) var(--ease-out-expo);
+}
+
+.btn-press:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-press:active {
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   STICKY MINI-BAR — compact buy bar that slides down from under the fixed
+   header once the main ADD TO CART has scrolled past.
+   -------------------------------------------------------------------------- */
+
+.minibar {
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  right: 0;
+  height: 56px;
+  /* Under the header (50), above page content and the progress rail. */
+  z-index: 45;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  transform: translateY(-100%);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform var(--dur-base) var(--ease-out-expo),
+    opacity var(--dur-base) var(--ease-out-expo),
+    visibility 0s linear var(--dur-base);
+}
+
+.minibar[data-visible="true"] {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  transition:
+    transform var(--dur-base) var(--ease-out-expo),
+    opacity var(--dur-base) var(--ease-out-expo),
+    visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minibar {
+    transform: none;
+    transition: opacity 1ms, visibility 0s linear 1ms;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   UTILITIES
+   -------------------------------------------------------------------------- */
+
+/* Hide the scrollbar on horizontal strips; scrolling still works. */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
   display: none;
 }
 

@@ -19,6 +19,8 @@ export interface Product {
   estimated: boolean;
   scale: SizeScale;
   sizes: string[];
+  /** Sizes currently unavailable — rendered struck-through and disabled. */
+  soldOut: string[];
   /** Pre-selected size used by the feed's one-tap ADD button. */
   defaultSize: string;
   images: {
@@ -45,8 +47,12 @@ const DEFAULT_SIZE_BY_SCALE: Record<SizeScale, string> = {
   belt: '32"',
 };
 
-type ProductSeed = Omit<Product, "id" | "sizes" | "defaultSize" | "images"> & {
+type ProductSeed = Omit<
+  Product,
+  "id" | "sizes" | "soldOut" | "defaultSize" | "images"
+> & {
   sizes?: string[];
+  soldOut?: string[];
 };
 
 const SEED: ProductSeed[] = [
@@ -56,6 +62,7 @@ const SEED: ProductSeed[] = [
     price: 4499,
     estimated: false,
     scale: "footwear",
+    soldOut: ["UK 6", "UK 11"],
     description:
       "Full-grain upper on a blown rubber lug sole. Goodyear-welted, unlined, built to deform around the wearer.",
   },
@@ -65,6 +72,7 @@ const SEED: ProductSeed[] = [
     price: 1899,
     estimated: false,
     scale: "belt",
+    soldOut: ['38"'],
     description:
       "Reclaimed tire carcass cut into a single strap. Raw edge, blackened hardware, no two identical.",
   },
@@ -74,6 +82,7 @@ const SEED: ProductSeed[] = [
     price: 5299,
     estimated: true,
     scale: "apparel",
+    soldOut: ["S"],
     description:
       "Panelled work shirt splitting green camo against 14oz brown raw denim. Boxy through the body, unwashed.",
   },
@@ -146,6 +155,7 @@ const SEED: ProductSeed[] = [
     price: 2199,
     estimated: true,
     scale: "apparel",
+    soldOut: ["XL"],
     description:
       "240gsm carded cotton, boxy body, ribbed collar. STRUCTURE-01 graphic printed heavy on the back.",
   },
@@ -160,16 +170,74 @@ const SEED: ProductSeed[] = [
   },
 ];
 
-export const products: Product[] = SEED.map((seed, i) => ({
-  ...seed,
-  id: String(i + 1).padStart(3, "0"),
-  sizes: seed.sizes ?? SIZES_BY_SCALE[seed.scale],
-  defaultSize: DEFAULT_SIZE_BY_SCALE[seed.scale],
-  images: {
-    primary: `/products/${seed.slug}-1.jpg`,
-    alternate: `/products/${seed.slug}-2.jpg`,
+export const products: Product[] = SEED.map((seed, i) => {
+  const sizes = seed.sizes ?? SIZES_BY_SCALE[seed.scale];
+  const soldOut = seed.soldOut ?? [];
+  const preferred = DEFAULT_SIZE_BY_SCALE[seed.scale];
+  return {
+    ...seed,
+    id: String(i + 1).padStart(3, "0"),
+    sizes,
+    soldOut,
+    // Never default to a size that can't be bought.
+    defaultSize: soldOut.includes(preferred)
+      ? (sizes.find((s) => !soldOut.includes(s)) ?? preferred)
+      : preferred,
+    images: {
+      primary: `/products/${seed.slug}-1.jpg`,
+      alternate: `/products/${seed.slug}-2.jpg`,
+    },
+  };
+});
+
+/* --------------------------------------------------------------------------
+   SIZE CHARTS — flat measurements per scale, garment measured, in cm unless
+   the column header says otherwise. Rendered as a monospace table.
+   -------------------------------------------------------------------------- */
+
+export interface SizeChart {
+  /** First column is always the size itself. */
+  columns: string[];
+  rows: string[][];
+  note: string;
+}
+
+export const SIZE_CHARTS: Record<SizeScale, SizeChart> = {
+  apparel: {
+    columns: ["SIZE", "CHEST", "LENGTH", "SHOULDER", "SLEEVE"],
+    rows: [
+      ["S", "104", "66", "46", "60"],
+      ["M", "110", "68", "48", "61.5"],
+      ["L", "116", "70", "50", "63"],
+      ["XL", "122", "72", "52", "64.5"],
+    ],
+    note: "GARMENT MEASUREMENTS IN CM, LAID FLAT. CUT BOXY — SIZE DOWN FOR A CLOSER FIT.",
   },
-}));
+  footwear: {
+    columns: ["UK", "EU", "US", "FOOT CM"],
+    rows: [
+      ["6", "39", "7", "24.5"],
+      ["7", "40.5", "8", "25.4"],
+      ["8", "42", "9", "26.2"],
+      ["9", "43", "10", "27.1"],
+      ["10", "44.5", "11", "27.9"],
+      ["11", "45.5", "12", "28.8"],
+    ],
+    note: "MEASURED ON A STANDARD LAST. UNLINED LEATHER STRETCHES HALF A SIZE WITH WEAR.",
+  },
+  belt: {
+    columns: ["SIZE", "WAIST CM", "TOTAL LENGTH"],
+    rows: [
+      ['28"', "71", "91"],
+      ['30"', "76", "96"],
+      ['32"', "81", "101"],
+      ['34"', "86", "106"],
+      ['36"', "91", "111"],
+      ['38"', "97", "117"],
+    ],
+    note: "CUT FROM RECLAIMED CARCASS — LENGTHS VARY BY UP TO 2CM.",
+  },
+};
 
 export function getProductBySlug(slug: string): Product | undefined {
   return products.find((p) => p.slug === slug);
