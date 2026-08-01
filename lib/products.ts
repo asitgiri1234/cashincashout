@@ -231,9 +231,12 @@ export const products: Product[] = LIVE_SLUGS.map((slug) => {
     defaultSize: soldOut.includes(preferred)
       ? (sizes.find((s) => !soldOut.includes(s)) ?? preferred)
       : preferred,
+    // PNG, not JPG: product shots are cut out to transparency so they sit on
+    // the page background rather than in a white box. A parked product needs
+    // its cutouts generated before it can go live in LIVE_SLUGS.
     images: Array.from(
       { length: seed.imageCount ?? 2 },
-      (_, n) => `/products/${seed.slug}-${n + 1}.jpg`,
+      (_, n) => `/products/${seed.slug}-${n + 1}.png`,
     ),
   };
 });
