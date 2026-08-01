@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Product } from "@/lib/products";
 import { formatPrice } from "@/lib/products";
+import { useOverlayLock } from "@/components/ui-overlay-context";
 import { EASE_OUT_EXPO } from "./motion-tokens";
 
 interface SizeSheetProps {
@@ -17,6 +18,9 @@ export function SizeSheet({ product, onClose, onConfirm }: SizeSheetProps) {
   const reduced = useReducedMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Hide the rotating badge while the sheet is up — it shares this corner.
+  useOverlayLock("size-sheet", product !== null);
 
   // Reset the choice each time a different product opens the sheet.
   useEffect(() => {

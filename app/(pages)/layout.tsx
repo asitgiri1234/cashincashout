@@ -16,7 +16,11 @@ export default function PagesLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex min-h-screen flex-col">
-      <main className="flex-1" style={{ paddingTop: "var(--header-h)" }}>
+      {/* page-reveal: content fades up once on load, 400ms. */}
+      <main
+        className="page-reveal flex-1"
+        style={{ paddingTop: "var(--header-h)" }}
+      >
         {children}
       </main>
       <SiteFooter />

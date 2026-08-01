@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { fontVariables } from "@/lib/fonts";
 import { CartProvider } from "@/components/cart-context";
+import { OverlayProvider } from "@/components/ui-overlay-context";
+import { ViewTransitionProvider } from "@/components/view-transitions";
 import { SiteHeader } from "@/components/site-header";
 import { CookieBar } from "@/components/cookie-bar";
 import { BadgeSlot } from "@/components/badge-slot";
@@ -37,12 +39,18 @@ export default function RootLayout({
     <html lang="en" className={fontVariables}>
       <body className="bg-bg text-text antialiased">
         <CartProvider>
-          <SiteHeader />
-          {children}
-          <CookieBar />
+          <OverlayProvider>
+            {/* Must live above the routed children: it parks the pending
+                view-transition resolver across the navigation. */}
+            <ViewTransitionProvider>
+              <SiteHeader />
+              {children}
+              <CookieBar />
 
-          {/* Reserved bottom-right badge slot — see components/badge-slot.tsx */}
-          <BadgeSlot />
+              {/* Fixed bottom-right badge — see components/badge-slot.tsx */}
+              <BadgeSlot />
+            </ViewTransitionProvider>
+          </OverlayProvider>
         </CartProvider>
       </body>
     </html>

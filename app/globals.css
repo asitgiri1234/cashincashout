@@ -25,13 +25,30 @@
   --header-h: 72px;
   --logo-h: 36px;
 
-  /* Reserved footprint for the fixed bottom-right badge (filled later).
+  /* Footprint of the fixed bottom-right rotating brand badge.
      Anything fixed to the bottom of the viewport must stay clear of this. */
-  --badge-w: 64px;
-  --badge-h: 64px;
-  --badge-inset: 20px;
-  --badge-safe: calc(var(--badge-w) + var(--badge-inset) * 2);
+  --badge-size: 88px; /* mobile; widened at the md breakpoint below */
+  --badge-inset: 24px;
+  --badge-safe: calc(var(--badge-size) + var(--badge-inset) * 2);
 }
+
+@media (min-width: 768px) {
+  :root {
+    --badge-size: 110px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   LAYER STACK — one place to reason about what covers what.
+
+     30  feed progress rail
+     40  cookie consent bar
+     50  fixed site header
+     55  rotating brand badge   <- above the page, below anything blocking
+     60  first-run feed hint overlay
+     70  modal scrim
+     71  modal surface (size sheet)
+   -------------------------------------------------------------------------- */
 
 @theme inline {
   --color-bg: var(--bg);
@@ -162,8 +179,80 @@ video {
 }
 
 /* --------------------------------------------------------------------------
+   GLOBAL HOVER TREATMENT
+
+   One transition definition for every interactive element: 200ms on the
+   expo curve. Properties are listed explicitly rather than using `all` —
+   `all` sweeps in layout-affecting properties and produces exactly the
+   colour-shift jank this is meant to avoid.
+   -------------------------------------------------------------------------- */
+
+a,
+button,
+summary,
+label,
+[role="button"],
+[role="tab"],
+input,
+select,
+textarea {
+  transition:
+    color var(--dur-fast) var(--ease-out-expo),
+    background-color var(--dur-fast) var(--ease-out-expo),
+    border-color var(--dur-fast) var(--ease-out-expo),
+    opacity var(--dur-fast) var(--ease-out-expo),
+    transform var(--dur-fast) var(--ease-out-expo);
+}
+
+/* --------------------------------------------------------------------------
+   PAGE-LOAD REVEAL — content fades up once, 400ms.
+   -------------------------------------------------------------------------- */
+
+.page-reveal {
+  animation: cico-rise var(--dur-base) var(--ease-out-expo) both;
+}
+
+/* --------------------------------------------------------------------------
+   VIEW TRANSITIONS
+
+   Next wraps App Router navigations in document.startViewTransition().
+   Browsers without the API just navigate — none of this applies and nothing
+   breaks. `product-media` is the shared name carried by the feed panel image
+   and the product page hero, which is what makes them morph.
+   -------------------------------------------------------------------------- */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-base);
+  animation-timing-function: var(--ease-out-expo);
+}
+
+::view-transition-group(product-media) {
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease-out-expo);
+}
+
+/* The morphing image should not cross-fade against itself mid-flight. */
+::view-transition-old(product-media),
+::view-transition-new(product-media) {
+  mix-blend-mode: normal;
+  height: 100%;
+}
+
+/* --------------------------------------------------------------------------
    MOTION
    -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Cut the navigation morph entirely — snap between pages instead. */
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-group(product-media),
+  ::view-transition-old(product-media),
+  ::view-transition-new(product-media) {
+    animation: none !important;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -271,6 +360,122 @@ video {
 
 .feed::-webkit-scrollbar {
   display: none;
+}
+
+/* --------------------------------------------------------------------------
+   ROTATING BRAND BADGE
+
+   The ring is a plain CSS animation so it spins with or without JS. The
+   component only modulates the running animation's playbackRate via WAAPI,
+   which changes speed without resetting position — animation-duration is not
+   an animatable property, so transitioning it would jump.
+
+   Only `transform` is animated, and the ring is promoted with will-change,
+   so the spin stays on the compositor and never stutters.
+   -------------------------------------------------------------------------- */
+
+@keyframes cico-badge-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.badge {
+  position: fixed;
+  right: var(--badge-inset);
+  bottom: var(--badge-inset);
+  width: var(--badge-size);
+  height: var(--badge-size);
+  z-index: 55;
+}
+
+.badge__main {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out-expo);
+}
+
+.badge:hover .badge__main,
+.badge__main:focus-visible {
+  transform: scale(1.08);
+}
+
+.badge__ring {
+  width: 100%;
+  height: 100%;
+  animation: cico-badge-spin 12s linear infinite;
+  will-change: transform;
+}
+
+.badge__text {
+  font-family: var(--font-meta), ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  fill: var(--text);
+}
+
+.badge__mark {
+  position: absolute;
+  font-family: var(--font-meta), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  /* Outside the rotating <svg>, so it stays upright while the ring spins. */
+}
+
+.badge__dismiss {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-out-expo),
+    border-color var(--dur-fast) var(--ease-out-expo);
+}
+
+.badge__dismiss svg {
+  width: 8px;
+  height: 8px;
+}
+
+.badge:hover .badge__dismiss,
+.badge__dismiss:focus-visible {
+  opacity: 1;
+}
+
+.badge__dismiss:hover {
+  border-color: var(--text);
+}
+
+/* Touch devices have no hover, so the dismiss control is always available. */
+@media (hover: none) {
+  .badge__dismiss {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge__ring {
+    animation: none;
+    will-change: auto;
+  }
+  .badge:hover .badge__main,
+  .badge__main:focus-visible {
+    transform: none;
+  }
 }
 
 .feed__panel--outro {

@@ -1,11 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+import { TransitionLink } from "@/components/view-transitions";
 import type { Product } from "@/lib/products";
 import { formatPrice } from "@/lib/products";
-import { Marquee } from "./marquee";
+import { Marquee } from "@/components/marquee";
 import { DUR_BASE, DUR_SLOW, EASE_OUT_EXPO, STAGGER } from "./motion-tokens";
 
 interface FeedPanelProps {
@@ -52,7 +52,9 @@ export function FeedPanel({
     <section
       ref={panelRef}
       data-index={index}
-      className="feed__panel"
+      // `group` sits on the panel, not the image wrapper: the tap-target Link
+      // overlays the image, so hover has to be tracked from a common ancestor.
+      className="feed__panel group"
       aria-roledescription="slide"
       aria-label={`${index + 1} of ${total}: ${product.title}`}
     >
@@ -64,19 +66,36 @@ export function FeedPanel({
         initial={reduced ? false : { scale: 1.05 }}
         animate={reduced ? {} : { scale: isActive ? 1 : 1.05 }}
         transition={{ duration: DUR_SLOW, ease: EASE_OUT_EXPO }}
+        // Half of the navigation morph: the product page hero carries the
+        // same `product-media` name. Only the ACTIVE panel gets it, because a
+        // view-transition-name must be unique within the document.
+        style={{ viewTransitionName: isActive ? "product-media" : undefined }}
       >
         {shouldRenderImage && (
-          <Image
-            src={product.images.primary}
-            alt=""
-            fill
-            // First panel is the LCP element. Everything else keeps
-            // next/image's default lazy loading — don't pass `loading`
-            // alongside `priority`, they conflict.
-            priority={index === 0}
-            sizes="100vw"
-            className="object-cover"
-          />
+          <>
+            <Image
+              src={product.images.primary}
+              alt=""
+              fill
+              // First panel is the LCP element. Everything else keeps
+              // next/image's default lazy loading — don't pass `loading`
+              // alongside `priority`, they conflict.
+              priority={index === 0}
+              sizes="100vw"
+              className="object-cover transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-0"
+            />
+            {/* Alternate view crossfades in on hover, 200ms. Only mounted for
+                the active panel — the others can't be hovered anyway. */}
+            {isActive && (
+              <Image
+                src={product.images.alternate}
+                alt=""
+                fill
+                sizes="100vw"
+                className="object-cover opacity-0 transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-100"
+              />
+            )}
+          </>
         )}
       </motion.div>
 
@@ -95,7 +114,7 @@ export function FeedPanel({
       {/* ---- TAP TARGET --------------------------------------------------
           Tapping the image goes to the product page. It sits beneath the
           controls so the buttons win any overlap. */}
-      <Link
+      <TransitionLink
         href={`/product/${product.slug}`}
         aria-label={`View ${product.title}`}
         className="absolute inset-0 z-10"

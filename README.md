@@ -128,17 +128,57 @@ and the header offset from [`app/(pages)/layout.tsx`](<app/(pages)/layout.tsx>)
 | Footer         | [`components/site-footer.tsx`](components/site-footer.tsx)   | Policy links + `© 2026 CICO`                     |
 | Cookie bar     | [`components/cookie-bar.tsx`](components/cookie-bar.tsx)     | Accept / Decline, persisted to `localStorage`    |
 | Cart state     | [`components/cart-context.tsx`](components/cart-context.tsx) | In-memory + `localStorage`, demo only            |
-| **Badge slot** | [`components/badge-slot.tsx`](components/badge-slot.tsx)     | **Reserved and intentionally empty** — see below |
+| Brand badge    | [`components/brand-badge.tsx`](components/brand-badge.tsx)   | Rotating circular-text badge — see below         |
 
-### Reserved badge slot
+### Rotating brand badge
 
-The fixed bottom-right corner is held open for a badge component to be added
-later. Its footprint is defined by `--badge-w`, `--badge-h`, `--badge-inset`,
-and the keep-out gutter `--badge-safe`.
+[`components/brand-badge.tsx`](components/brand-badge.tsx) — fixed
+bottom-right, 110px (88px mobile), 24px from the edges, z-index 55 (above the
+page, below modals — see the layer stack comment in globals.css).
 
-Both the footer and the cookie bar already respect `--badge-safe`, so nothing
-collides. To fill it, drop the badge inside the wrapper in
-`components/badge-slot.tsx` — positioning and sizing are already handled.
+- **SVG circular text**, not an image: `"CASH IN CASH OUT • CASH IN CASH OUT • "`
+  on a `<textPath>`. `textLength` is set to the circle's exact circumference
+  with `lengthAdjust="spacing"`, which is what closes the loop with no gap and
+  no overlap — and keeps it closed if the wording is edited.
+- **Rotation** is a plain CSS animation (12s linear infinite, transform only,
+  `will-change: transform`) so it runs on the compositor.
+- **Hover speed-up** modulates the running animation's `playbackRate` via
+  WAAPI, ramped over 400ms with easeInOutCubic. Two traps documented in the
+  component: `updatePlaybackRate()` is async and swallows per-frame calls
+  (rate never moves, then snaps), while bare `playbackRate =` jumps
+  `currentTime` — so it sets the rate synchronously and rebases the time.
+- The **CICO centre mark** sits outside the rotating `<svg>`, so it stays
+  upright.
+- **Click** scrolls to top (the feed scroller on the homepage, the window
+  elsewhere). **Dismiss ×** (visible on hover, always visible on touch)
+  persists to localStorage.
+- Hides itself while any overlay is open, via
+  [`components/ui-overlay-context.tsx`](components/ui-overlay-context.tsx) —
+  the size sheet registers with `useOverlayLock("size-sheet", open)`; a future
+  cart drawer or search overlay should do the same.
+- Reduced motion: rotation stops, badge stays functional.
+
+Its footprint is still published as `--badge-size` / `--badge-inset` /
+`--badge-safe`, which the footer, feed controls and size sheet respect.
+
+### Motion system
+
+- **View transitions** ([`components/view-transitions.tsx`](components/view-transitions.tsx)):
+  `TransitionLink` wraps navigation in `document.startViewTransition()`, and the
+  active feed panel image + product page hero share
+  `view-transition-name: product-media`, so the image morphs between pages.
+  Unsupported browsers and reduced-motion users get a plain navigation.
+  Note: `experimental.viewTransition` in next.config is deliberately OFF — it
+  only enables React's `<ViewTransition>` component, it does not wrap App
+  Router navigations (verified; see comment in next.config.ts).
+- **Hover**: one global rule — 200ms, `--ease-out-expo`, explicit property
+  list (never `all`).
+- **Crossfade**: feed panels and the PDP hero swap primary → alternate image
+  on hover over 200ms.
+- **Page-load reveal**: `.page-reveal` fades content up once, 400ms.
+- **`<Marquee>`** ([`components/marquee.tsx`](components/marquee.tsx)) is
+  reusable anywhere: `text`, `paused`, `repeat`, `durationSeconds`,
+  `separator` props.
 
 ---
 
@@ -164,11 +204,12 @@ generated placeholders — swap them for real photography.
 
 ## Not built yet
 
-- Product detail pages (`/product/[slug]` is linked from every panel)
 - Cart page (`/cart` is linked from the header)
 - Policy pages (footer links are placeholders)
 
 Until those exist, Next's `<Link>` prefetch logs a 404 per missing route in the
-console on the homepage. Harmless, and it clears itself as the pages get built.
+console. Harmless, and it clears itself as the pages get built.
 
 New pages go in `app/(pages)/` so they pick up the header offset and footer.
+Product pages exist at `/product/[slug]`, statically generated from the
+catalog.
