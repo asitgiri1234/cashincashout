@@ -57,7 +57,11 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={fontVariables}>
-      <body className="bg-bg text-text antialiased">
+      <body className="text-text antialiased">
+        {/* Warm gradient behind everything; black at the top so the white
+            wordmark in the fixed header never sits on a light surface. */}
+        <div className="warm-backdrop" aria-hidden="true" />
+
         <OverlayProvider>
           {/* Must live above the routed children: it parks the pending
               view-transition resolver across the navigation. */}

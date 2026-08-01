@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SIZE_CHARTS, type SizeScale } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
-import { DUR_BASE, EASE_OUT_EXPO } from "@/components/feed/motion-tokens";
+import { DUR_BASE, EASE_OUT_EXPO } from "@/components/motion-tokens";
 
 export function SizeChartModal({
   scale,
@@ -122,3 +122,4 @@ export function SizeChartModal({
     </AnimatePresence>
   );
 }
+

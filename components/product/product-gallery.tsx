@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { Product } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
-import { DUR_FAST, EASE_OUT_EXPO } from "@/components/feed/motion-tokens";
+import { DUR_FAST, EASE_OUT_EXPO } from "@/components/motion-tokens";
 
 /**
  * Product gallery.
@@ -47,7 +47,7 @@ export function ProductGallery({ product }: { product: Product }) {
               key={src}
               type="button"
               onClick={() => setLightbox(i)}
-              className="relative aspect-4/5 w-full shrink-0 snap-start bg-surface"
+              className="relative aspect-4/5 w-full shrink-0 snap-start"
               aria-label={`Open image ${i + 1} of ${images.length} full screen`}
             >
               <Image
@@ -56,7 +56,7 @@ export function ProductGallery({ product }: { product: Product }) {
                 fill
                 priority={i === 0}
                 sizes="100vw"
-                className="object-cover"
+                className="object-contain"
                 style={
                   i === 0 ? { viewTransitionName: "product-media" } : undefined
                 }
@@ -98,7 +98,7 @@ export function ProductGallery({ product }: { product: Product }) {
             key={src}
             type="button"
             onClick={() => setLightbox(i)}
-            className="relative aspect-4/5 w-full cursor-zoom-in bg-surface"
+            className="relative aspect-4/5 w-full cursor-zoom-in"
             aria-label={`Open image ${i + 1} of ${images.length} full screen`}
           >
             <Image
@@ -107,7 +107,7 @@ export function ProductGallery({ product }: { product: Product }) {
               fill
               priority={i === 0}
               sizes="60vw"
-              className="object-cover"
+              className="object-contain"
               // Morph target. Only rendered md+ while the mobile copy is
               // hidden by CSS on the same breakpoint, so the name stays
               // unique among *painted* elements.
@@ -246,7 +246,7 @@ function Lightbox({
               aria-label="Previous image"
               className="meta border border-border bg-bg px-3 py-2 text-[12px] hover:border-text disabled:opacity-30"
             >
-              ←
+              â†
             </button>
             <span className="meta text-[11px] text-text-secondary">
               {(index ?? 0) + 1} / {images.length}
@@ -261,7 +261,7 @@ function Lightbox({
               aria-label="Next image"
               className="meta border border-border bg-bg px-3 py-2 text-[12px] hover:border-text disabled:opacity-30"
             >
-              →
+              â†’
             </button>
           </div>
         </motion.div>
@@ -269,3 +269,4 @@ function Lightbox({
     </AnimatePresence>
   );
 }
+

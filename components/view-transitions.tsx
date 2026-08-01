@@ -70,6 +70,15 @@ export function ViewTransitionProvider({
 
   const navigate = useCallback<NavigateFn>(
     (href) => {
+      // Navigating to the route you are already on produces no pathname
+      // change, so the resolver below would never fire and the transition
+      // would sit frozen — rendering suppressed — until its timeout. Skip
+      // the transition entirely for a same-route push.
+      if (href === pathname) {
+        router.push(href);
+        return;
+      }
+
       if (!canTransition()) {
         router.push(href);
         return;
@@ -88,7 +97,7 @@ export function ViewTransitionProvider({
           }),
       );
     },
-    [router],
+    [router, pathname],
   );
 
   return (

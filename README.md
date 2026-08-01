@@ -35,8 +35,16 @@ localhost.
 
 ## Design direction
 
-Industrial / brutalist streetwear. Dark, stark, almost no UI chrome — product
+Industrial / brutalist streetwear. Stark, almost no UI chrome — product
 imagery does the talking.
+
+The page sits on a fixed warm gradient (`.warm-backdrop` in globals.css) that
+runs brand black at the top into deep orange below. It starts black on
+purpose: the header floats over it and the CICO wordmark is white ink, which
+must never land on a light surface. `<body>` is deliberately **transparent** —
+a background colour there would hide the gradient entirely, because a
+negative-`z-index` child of the root stacking context paints *before* an
+in-flow descendant's background.
 
 ### Tokens
 
@@ -78,66 +86,48 @@ Use the `.meta` class for anything numeric or machine-ish.
 
 ---
 
-## Homepage — the swipe feed
+## Homepage — the catalogue grid
 
-The homepage is the signature of the site and is deliberately **not** a product
-grid. It's a full-screen vertical swipe feed: one product per viewport panel,
-TikTok/Reels style.
+[`components/catalog/product-grid.tsx`](components/catalog/product-grid.tsx),
+rendered by [`app/(pages)/page.tsx`](<app/(pages)/page.tsx>).
 
-[`components/feed/`](components/feed/)
+Products laid out side by side on the warm backdrop — 2 columns on mobile, 3 at
+`md`, 4 at `lg` — scrolling vertically through the rows.
 
-| File                | Role                                                       |
-| ------------------- | ---------------------------------------------------------- |
-| `product-feed.tsx`  | Scroll container, active-panel tracking, keyboard nav       |
-| `feed-panel.tsx`    | One panel: image, scrims, staggered entry, controls         |
-| `marquee.tsx`       | Seamless infinite title marquee                             |
-| `size-sheet.tsx`    | Bottom-sheet size picker                                    |
-| `entry-overlay.tsx` | First-run "TAP OR SWIPE UP" hint                            |
-| `progress-rail.tsx` | Thin vertical position indicator, right edge                |
-| `motion-tokens.ts`  | CSS motion tokens mirrored for Framer Motion                |
+**Cutouts, not photos in boxes.** Every shot is a transparent PNG, so garments
+float directly on the page with no card, border or plate behind them. That
+makes `object-contain` mandatory: a cover-fit would crop the toe off a boot or
+the buckle off a belt. A soft `drop-shadow` re-grounds each cutout, since a
+hard-edged cutout otherwise reads as pasted on.
 
-**Panels** are `100dvh` — not `100vh`, which breaks on mobile as browser chrome
-collapses. The container is `scroll-snap-type: y mandatory`, each panel
-`scroll-snap-align: start` with `scroll-snap-stop: always`.
+**The morph is handed over on click.** The card's image and the product page
+hero share `view-transition-name: product-media`, but that name has to be
+unique per document and the grid shows six products at once. So no card claims
+it until the moment one is clicked, when it's assigned imperatively —
+`document.startViewTransition()` snapshots the old DOM synchronously during the
+click handler, and a React state update would not have committed in time.
 
-**Active panel** is tracked by an `IntersectionObserver` rooted on the scroller
-at `threshold: 0.6`, so exactly one panel qualifies and there's no flicker
-mid-snap. Only the active panel animates; every other marquee is paused.
+Everything is derived from the catalogue, so adding a product to `LIVE_SLUGS`
+is all that's needed — the grid, search and MORE strip pick it up.
 
-**Marquee** duplicates the title track and translates it exactly `-50%`, which
-lands the clone where the original started — no visible seam. Pure CSS, no JS
-ticker. The separator glyph is deliberately not `/` or `//`, since those carry
-meaning inside product titles.
-
-**Entry** staggers in as a panel activates: image scales `1.05 → 1.0` over
-700ms, text rises 20px with 60ms between elements, all on `--ease-out-expo`.
-
-**Performance:** images mount only for the active panel ±2 (`RENDER_WINDOW`).
-The first panel gets `priority`; the rest stay lazy.
-
-**Keyboard:** arrow up/down move between panels. Ignored while the size sheet is
-open or focus is in a field.
-
-**Reduced motion:** marquee and parallax are disabled entirely, opacity fades
-kept. The marquee clone is hidden and the title becomes scrollable so long
-names stay readable.
+> The full-screen swipe feed that previously lived here was replaced by this
+> grid. Its components (`product-feed`, `feed-panel`, `entry-overlay`,
+> `progress-rail`, `size-sheet`) were removed; `motion-tokens.ts` moved up to
+> `components/`. Git history has them if the feed is ever wanted back.
 
 ### Layout coordination
 
-Three things compete for the bottom of the screen, so they coordinate through
-CSS custom properties rather than magic numbers:
+Fixed UI at the bottom of the screen coordinates through CSS custom properties
+rather than magic numbers:
 
-- `--badge-safe` — keep-out gutter for the reserved bottom-right badge slot.
-- `--consent-h` — published at runtime by `CookieBar` while it's on screen, so
-  the panel's ADD / CHOOSE row lifts clear of it instead of being covered.
-- Panel padding uses `max()` of the two, not the sum: the badge is bottom-right
-  and the cookie bar bottom-left, so they share one horizontal band.
+- `--badge-safe` — keep-out gutter for the fixed bottom-right badge.
+- `--consent-h` — published at runtime by `CookieBar` while it is on screen.
+- Consumers take `max()` of the two, not the sum: the badge is bottom-right and
+  the cookie bar bottom-left, so they share one horizontal band.
 
-The **footer lives inside the feed scroller** as a final snap section, not in
-the root layout. A footer in normal flow below a full-viewport snap feed bleeds
-into the panels the moment scroll chains. Ordinary content pages get the footer
-and the header offset from [`app/(pages)/layout.tsx`](<app/(pages)/layout.tsx>)
-— put anything that isn't the feed in that route group.
+The homepage lives in the `(pages)` route group, so it picks up the fixed-header
+offset and the site footer from
+[`app/(pages)/layout.tsx`](<app/(pages)/layout.tsx>) like every other page.
 
 ---
 
@@ -189,16 +179,18 @@ Its footprint is still published as `--badge-size` / `--badge-inset` /
 
 - **View transitions** ([`components/view-transitions.tsx`](components/view-transitions.tsx)):
   `TransitionLink` wraps navigation in `document.startViewTransition()`, and the
-  active feed panel image + product page hero share
+  clicked grid card + product page hero share
   `view-transition-name: product-media`, so the image morphs between pages.
-  Unsupported browsers and reduced-motion users get a plain navigation.
+  Unsupported browsers and reduced-motion users get a plain navigation, and a
+  same-route push skips the transition entirely — with no pathname change the
+  resolver would never fire and the page would sit frozen until the timeout.
   Note: `experimental.viewTransition` in next.config is deliberately OFF — it
   only enables React's `<ViewTransition>` component, it does not wrap App
   Router navigations (verified; see comment in next.config.ts).
 - **Hover**: one global rule — 200ms, `--ease-out-expo`, explicit property
-  list (never `all`).
-- **Crossfade**: feed panels and the PDP hero swap primary → alternate image
-  on hover over 200ms.
+  list (never `all`). Grid cards also lift and grow their drop shadow.
+- **Crossfade**: grid cards, the MORE strip and the PDP hero swap primary →
+  alternate image on hover over 200ms, where a second photo exists.
 - **Page-load reveal**: `.page-reveal` fades content up once, 400ms.
 - **`<Marquee>`** ([`components/marquee.tsx`](components/marquee.tsx)) is
   reusable anywhere: `text`, `paused`, `repeat`, `durationSeconds`,
@@ -208,10 +200,15 @@ Its footprint is still published as `--badge-size` / `--badge-inset` /
 
 ## Catalog
 
-[`lib/products.ts`](lib/products.ts) — 12 products, prices in INR.
+[`lib/products.ts`](lib/products.ts) — prices in INR.
+
+`LIVE_SLUGS` decides what ships. The demo currently runs six products; the rest
+of the catalogue stays parked in `SEED` until its photography lands, and going
+live is one line. The order of that list is the order of the grid.
 
 Each entry has `id`, `slug`, `title`, `price`, `estimated`, `scale`, `sizes`,
-`images.primary` / `images.alternate`, and a `description`.
+`soldOut`, `defaultSize`, an `images` array, and a `description`. Products opt
+into more than two photos with `imageCount`.
 
 Size scales: `apparel` (S/M/L/XL), `footwear` (UK 6–11), `belt` (28"–38").
 
@@ -221,8 +218,26 @@ placeholder pending final costing.
 > **Brand rule:** the `//` separator in product titles is a brand signature.
 > Preserve it exactly. Never normalise it to `/`, `|`, or `&`.
 
-Product imagery is at `/public/products/{slug}-1.jpg` and `-2.jpg`. These are
-generated placeholders — swap them for real photography.
+### Imagery
+
+Live products are served as **transparent PNGs** at
+`/public/products/{slug}-{n}.png`. The `.jpg` alongside each one is the
+reframed studio shot the cutout was derived from; keep it if the cutout ever
+needs regenerating.
+
+Adding photography for a parked product:
+
+1. Reframe the studio shot onto the shared 4:5 canvas.
+2. Cut the backdrop out to transparency (border-connected flood fill, plus
+   reclaiming any backdrop pocket the fill can't reach — a closed loop like the
+   belt traps one — then feather and de-fringe the rim).
+3. Re-fit the cutout to fill the frame; the grid never crops, so the old
+   feed-crop safety margin is just dead space.
+4. Add the slug to `LIVE_SLUGS`.
+
+> Next caches optimised images under `.next/cache/images` keyed by URL, so
+> replacing a file without renaming it serves the stale version until that
+> cache is cleared.
 
 ---
 

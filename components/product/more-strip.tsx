@@ -25,13 +25,13 @@ export function MoreStrip({ current }: { current: Product }) {
             href={`/product/${p.slug}`}
             className="group w-[240px] shrink-0 snap-start md:w-[280px]"
           >
-            <div className="relative aspect-4/5 overflow-hidden bg-surface">
+            <div className="relative aspect-4/5 overflow-hidden">
               <Image
                 src={p.images[0]}
                 alt={p.title}
                 fill
                 sizes="280px"
-                className="object-cover transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-0"
+                className="object-contain transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-0"
               />
               {/* Only products with a second photo get the hover crossfade. */}
               {p.images[1] && (
@@ -40,7 +40,7 @@ export function MoreStrip({ current }: { current: Product }) {
                   alt=""
                   fill
                   sizes="280px"
-                  className="object-cover opacity-0 transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-100"
+                  className="object-contain opacity-0 transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-100"
                 />
               )}
             </div>

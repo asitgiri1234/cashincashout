@@ -105,7 +105,7 @@ export function PurchasePanel({ product }: { product: Product }) {
           onClick={() => setQty((q) => Math.max(1, q - 1))}
           disabled={qty <= 1}
           aria-label="Decrease quantity"
-          className="meta px-4 py-3 text-[13px] hover:bg-surface disabled:opacity-30"
+          className="meta px-4 py-3 text-[13px] hover:disabled:opacity-30"
         >
           −
         </button>
@@ -120,7 +120,7 @@ export function PurchasePanel({ product }: { product: Product }) {
           onClick={() => setQty((q) => Math.min(9, q + 1))}
           disabled={qty >= 9}
           aria-label="Increase quantity"
-          className="meta px-4 py-3 text-[13px] hover:bg-surface disabled:opacity-30"
+          className="meta px-4 py-3 text-[13px] hover:disabled:opacity-30"
         >
           +
         </button>
@@ -156,13 +156,13 @@ export function PurchasePanel({ product }: { product: Product }) {
         aria-hidden={!showMiniBar}
       >
         <div className="mx-auto flex h-full max-w-[1800px] items-center gap-3 px-5 md:px-8">
-          <div className="relative h-10 w-8 shrink-0 bg-surface">
+          <div className="relative h-10 w-8 shrink-0">
             <Image
               src={product.images[0]}
               alt=""
               fill
               sizes="32px"
-              className="object-cover"
+              className="object-contain"
             />
           </div>
           <p className="min-w-0 flex-1 truncate text-[12px]">

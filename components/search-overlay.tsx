@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +8,7 @@ import { useUiStore } from "@/lib/ui-store";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { TransitionLink } from "@/components/view-transitions";
-import { DUR_BASE, EASE_OUT_EXPO } from "@/components/feed/motion-tokens";
+import { DUR_BASE, EASE_OUT_EXPO } from "@/components/motion-tokens";
 
 /**
  * Full-screen search. Live client-side filtering over the local catalog —
@@ -114,13 +114,13 @@ export function SearchOverlay() {
                         onClick={() => setOpen(false)}
                         className="group flex items-center gap-4 border-b border-border py-3 hover:bg-surface"
                       >
-                        <div className="relative h-14 w-11 shrink-0 bg-surface">
+                        <div className="relative h-14 w-11 shrink-0">
                           <Image
                             src={p.images[0]}
                             alt={p.title}
                             fill
                             sizes="44px"
-                            className="object-cover"
+                            className="object-contain"
                           />
                         </div>
                         <p className="min-w-0 flex-1 truncate text-[13px]">
@@ -141,3 +141,4 @@ export function SearchOverlay() {
     </AnimatePresence>
   );
 }
+

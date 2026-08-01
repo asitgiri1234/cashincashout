@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useAnyOverlayOpen } from "./ui-overlay-context";
-import { DUR_BASE, EASE_OUT_EXPO } from "./feed/motion-tokens";
+import { DUR_BASE, EASE_OUT_EXPO } from "./motion-tokens";
 
 const STORAGE_KEY = "cico.badge-dismissed.v1";
 
@@ -134,13 +134,7 @@ export function BrandBadge() {
 
   // ---- SCROLL TO TOP -----------------------------------------------------
   const scrollToTop = useCallback(() => {
-    const behavior: ScrollBehavior = reduced ? "auto" : "smooth";
-    // On the homepage the real scroll container is the feed, not the window.
-    const feed = document.querySelector<HTMLElement>(".feed");
-    if (feed && feed.scrollHeight > feed.clientHeight) {
-      feed.scrollTo({ top: 0, behavior });
-    }
-    window.scrollTo({ top: 0, behavior });
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
   }, [reduced]);
 
   const visible = ready && !dismissed && !overlayOpen;
@@ -218,3 +212,4 @@ export function BrandBadge() {
     </AnimatePresence>
   );
 }
+

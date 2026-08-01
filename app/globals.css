@@ -87,7 +87,11 @@
   }
 
   body {
-    background: var(--bg);
+    /* Transparent on purpose. The warm backdrop is a fixed z-index:-1 child
+       of the root stacking context, and per CSS painting order those paint
+       BEFORE an in-flow descendant's background — so any colour on <body>
+       would cover the gradient entirely. The base colour lives on <html>. */
+    background: transparent;
     color: var(--text);
     font-family: var(--font-display), "Arial Narrow", system-ui, sans-serif;
     font-stretch: 88%; /* condensed */
@@ -347,26 +351,51 @@ textarea {
 }
 
 /* --------------------------------------------------------------------------
-   FEED — full-viewport vertical snap scroller.
+   WARM BACKDROP
 
-   100dvh, NOT 100vh: mobile browser chrome collapses on scroll and 100vh
-   leaves a gap / causes a jump. dvh tracks the real viewport.
+   Fixed behind everything, so the gradient stays put while the catalogue
+   scrolls over it rather than sliding away.
+
+   Deliberately BLACK at the top. The CICO wordmark is white ink and must
+   never sit on a light surface, and the header floats over this — so the
+   first band stays brand black and the warmth builds below it.
+
+   A fixed element, not `background-attachment: fixed`, which is unreliable
+   on mobile Safari.
    -------------------------------------------------------------------------- */
 
-.feed {
-  height: 100dvh;
-  overflow-y: scroll;
-  scroll-snap-type: y mandatory;
-  /* The feed owns the whole gesture. The footer is a snap section INSIDE the
-     scroller, so nothing below needs to be reachable by chaining — and
-     chaining would drag the page behind the panels mid-scroll. */
-  overscroll-behavior-y: contain;
-  /* Scrollbar hidden here only — the progress rail is the position indicator. */
-  scrollbar-width: none;
+.warm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    #0a0a0a 0%,
+    #0a0a0a 8%,
+    #2c1108 20%,
+    #7c2a11 38%,
+    #c2501e 58%,
+    #e8763a 76%,
+    #b23c14 92%,
+    #6d200a 100%
+  );
 }
 
-.feed::-webkit-scrollbar {
-  display: none;
+@media (prefers-reduced-motion: no-preference) {
+  .warm-backdrop {
+    /* Only a fade-in on load; the gradient itself never animates. */
+    animation: cico-fade var(--dur-slow) var(--ease-out-expo) both;
+  }
+}
+
+@keyframes cico-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -560,18 +589,28 @@ textarea {
   }
 }
 
-.feed__panel--outro {
-  /* No photography here — sit on the page background, not the image scrim. */
-  background: var(--bg);
+/* --------------------------------------------------------------------------
+   CATALOGUE GRID
+
+   Products are cut out to transparency, so they float on the backdrop with
+   no card, border or box. A soft drop shadow re-grounds them — without it a
+   cutout reads as pasted-on.
+   -------------------------------------------------------------------------- */
+
+.card__media {
+  filter: drop-shadow(0 18px 28px rgb(0 0 0 / 0.42));
+  transition:
+    transform var(--dur-base) var(--ease-out-expo),
+    filter var(--dur-base) var(--ease-out-expo);
 }
 
-.feed__panel {
-  height: 100dvh;
-  /* Panels outside the render window have no image mounted — this stops a
-     flash of page background during a fast fling. */
-  background: var(--surface);
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  position: relative;
-  overflow: hidden;
+.card:hover .card__media {
+  transform: translateY(-6px) scale(1.03);
+  filter: drop-shadow(0 26px 36px rgb(0 0 0 / 0.5));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover .card__media {
+    transform: none;
+  }
 }

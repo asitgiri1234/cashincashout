@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useEffect, useRef } from "react";
@@ -7,7 +7,7 @@ import { useCartStore, selectSubtotal, type CartLine } from "@/lib/cart-store";
 import { getProductBySlug, formatPrice } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
-import { DUR_BASE, EASE_OUT_EXPO } from "@/components/feed/motion-tokens";
+import { DUR_BASE, EASE_OUT_EXPO } from "@/components/motion-tokens";
 
 /**
  * Cart drawer — slides in from the right over a blurred backdrop.
@@ -103,7 +103,7 @@ export function CartDrawer() {
                     onClick={() => setOpen(false)}
                     className="meta border border-border px-4 py-3 text-[11px] hover:border-text"
                   >
-                    BACK TO THE FEED
+                    BACK TO THE CATALOGUE
                   </button>
                 </motion.div>
               )}
@@ -165,13 +165,13 @@ function CartRow({ line }: { line: CartLine }) {
       className="overflow-hidden border-b border-border"
     >
       <div className="flex gap-3 py-4">
-        <div className="relative h-20 w-16 shrink-0 bg-surface">
+        <div className="relative h-20 w-16 shrink-0">
           <Image
             src={product.images[0]}
             alt={product.title}
             fill
             sizes="64px"
-            className="object-cover"
+            className="object-contain"
           />
         </div>
 
@@ -199,7 +199,7 @@ function CartRow({ line }: { line: CartLine }) {
                 aria-label="Decrease quantity"
                 className="meta px-2.5 py-1 text-[12px] hover:bg-surface"
               >
-                −
+                âˆ’
               </button>
               <span className="meta flex min-w-[2rem] items-center justify-center border-x border-border text-[11px] tabular-nums">
                 {line.qty}
@@ -209,7 +209,7 @@ function CartRow({ line }: { line: CartLine }) {
                 onClick={() => setQty(line.slug, line.size, line.qty + 1)}
                 disabled={line.qty >= 9}
                 aria-label="Increase quantity"
-                className="meta px-2.5 py-1 text-[12px] hover:bg-surface disabled:opacity-30"
+                className="meta px-2.5 py-1 text-[12px] hover:disabled:opacity-30"
               >
                 +
               </button>
@@ -223,3 +223,4 @@ function CartRow({ line }: { line: CartLine }) {
     </motion.li>
   );
 }
+
