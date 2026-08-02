@@ -105,10 +105,8 @@ const SEED: ProductSeed[] = [
     price: 5299,
     estimated: true,
     scale: "apparel",
-    // Camo face only. The shot previously filed here as the reverse was the
-    // GREEN camo shirt's brown denim back (green lining at the collar), so it
-    // moved to that product; the grey denim reverse isn't photographed yet.
-    imageCount: 1,
+    // Real photography: brown camo face + the grey raw denim reverse.
+    imageCount: 2,
     description:
       "The earth colourway of the panelled work shirt. Brown camo against grey raw denim, unwashed selvedge.",
   },
