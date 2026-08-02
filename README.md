@@ -8,14 +8,65 @@ Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · Framer Motion · Zus
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
-npm run build      # production build (all routes prerender)
-npm start          # serve the production build
+cp .env.example .env.local   # then fill in DATABASE_URL
+npm run dev                  # http://localhost:3000
+npm run build                # production build (all routes prerender)
+npm start                    # serve the production build
 ```
 
-No environment variables are required. `NEXT_PUBLIC_SITE_URL` may be set to
-the deployed origin so Open Graph URLs resolve absolutely; it defaults to
-localhost.
+`NEXT_PUBLIC_SITE_URL` may be set to the deployed origin so Open Graph URLs
+resolve absolutely; it defaults to localhost.
+
+## Database
+
+Supabase Postgres via [Drizzle](https://orm.drizzle.team).
+
+```bash
+npm run db:generate   # SQL migration from lib/db/schema.ts
+npm run db:migrate    # apply pending migrations
+npm run db:seed       # load the catalogue from lib/products.ts (idempotent)
+npm run db:studio     # browse the data
+```
+
+| Path                  | Role                                              |
+| --------------------- | ------------------------------------------------- |
+| `lib/db/schema.ts`    | Tables, enums, relations — the source of truth     |
+| `lib/db/client.ts`    | The client. Import this from CLI scripts           |
+| `lib/db/index.ts`     | Same client behind `server-only`. Import from app  |
+| `lib/db/migrations/`  | Generated SQL. Committed; never hand-edited        |
+| `scripts/seed.ts`     | Ports the hardcoded catalogue into the database    |
+| `scripts/db-check.ts` | Read-back sanity check                             |
+
+### Three rules the schema is built around
+
+Each is cheap now and painful to retrofit once real orders exist.
+
+1. **Money is integer paise, never a float.** ₹4,499 is stored as `449900`.
+   Binary floating point cannot represent decimal money exactly, and the
+   drift will not reconcile.
+2. **Stock lives on the variant, not the product.** A product has many sizes
+   and each sells independently; `size` on the product would force the
+   title/price/description to be duplicated per size.
+3. **Order lines snapshot what was sold.** Title, size and unit price are
+   copied onto the line at purchase. Joined live, repricing an item would
+   silently rewrite what past customers paid and invalidate issued invoices.
+
+Checkout is **guest-first**: `orders.email` is always required and
+`orders.customer_id` is nullable, so an account is optional convenience
+rather than a gate. `orders.gateway_payment_id` is uniquely indexed so a
+replayed payment webhook cannot double-credit an order.
+
+### Two connection strings
+
+Supabase gives you a **direct** URL (port 5432) and a **pooled** one (6543,
+PgBouncer). Migrations must use direct — PgBouncer in transaction mode cannot
+run some DDL. The deployed app must use pooled — serverless opens a
+connection per invocation and would exhaust the direct limit. `drizzle-kit`
+also runs outside Next, so `drizzle.config.ts` loads `.env.local` explicitly;
+Next loads it for the app on its own.
+
+> The storefront still reads from `lib/products.ts`. The database is seeded
+> and queryable but not yet wired into the pages — that swap comes next.
 
 ## What is demo-only
 
