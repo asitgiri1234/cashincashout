@@ -43,8 +43,12 @@ const SIZES_BY_SCALE: Record<SizeScale, string[]> = {
   belt: BELT_SIZES,
 };
 
-/** Middle-of-the-run size per scale — what ADD drops in without asking. */
-const DEFAULT_SIZE_BY_SCALE: Record<SizeScale, string> = {
+/**
+ * Middle-of-the-run size per scale — what ADD drops in without asking.
+ * Exported so the database-backed catalogue preselects the same size; picking
+ * the first in-stock size instead would default footwear to UK 7.
+ */
+export const DEFAULT_SIZE_BY_SCALE: Record<SizeScale, string> = {
   apparel: "M",
   footwear: "UK 9",
   belt: '32"',

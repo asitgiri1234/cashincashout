@@ -65,8 +65,60 @@ connection per invocation and would exhaust the direct limit. `drizzle-kit`
 also runs outside Next, so `drizzle.config.ts` loads `.env.local` explicitly;
 Next loads it for the app on its own.
 
-> The storefront still reads from `lib/products.ts`. The database is seeded
-> and queryable but not yet wired into the pages — that swap comes next.
+### Where the storefront gets its data
+
+Pages read the database through [`lib/catalog.ts`](lib/catalog.ts), which
+returns the same `Product` shape the components already consumed — so
+switching the source changed no component.
+
+`lib/products.ts` is still present and still the **seed source**, and it
+doubles as a fallback: if the database is unreachable (most likely
+`DATABASE_URL` missing in the deployment), the catalogue layer logs loudly and
+serves the static list instead. The site is live, so a missing variable has to
+degrade to stale-but-correct content rather than an empty shop or a failed
+build.
+
+## Admin
+
+`/admin` — product list, edit form, per-size stock, live/draft toggle.
+Saving calls `revalidatePath`, so an edit reaches the statically generated
+storefront immediately.
+
+### Access
+
+| Environment | Behaviour                                                |
+| ----------- | -------------------------------------------------------- |
+| development | Open. No login, so local work has no friction.            |
+| production  | Requires `ADMIN_PASSWORD`. **Unset ⇒ `/admin` 404s.**     |
+
+It **fails closed**: forgetting the variable hides the dashboard rather than
+publishing an open write surface. The session cookie holds an HMAC derived
+from the password rather than the password itself, and is `httpOnly` so an
+XSS anywhere on the storefront cannot steal it.
+
+> `middleware.ts` guards the admin *pages*. It is deliberately not the only
+> check — Server Actions are POST endpoints with stable ids that can be
+> invoked directly, without ever loading a guarded route. Every mutating
+> action in `app/admin/actions.ts` calls `requireAdmin()` itself. Guarding
+> only the route would be decorative.
+
+`ADMIN_EMAILS` in [`lib/admin-auth.ts`](lib/admin-auth.ts) records who should
+be allowed in, but is **not enforced yet** — an allowlist can only be checked
+once authentication establishes *who* is asking, and a shared password proves
+possession of a secret, not an identity. Wire it in when email sign-in lands.
+
+## Deploying
+
+Set in Vercel → Settings → Environment Variables:
+
+| Variable              | Notes                                                     |
+| --------------------- | --------------------------------------------------------- |
+| `DATABASE_URL`        | Use the **pooled** string (port 6543), not direct          |
+| `ADMIN_PASSWORD`      | Production only. Without it `/admin` 404s                  |
+| `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs              |
+
+Migrations are not run at deploy time — run `npm run db:migrate` yourself,
+against the **direct** connection, before shipping a schema change.
 
 ## What is demo-only
 

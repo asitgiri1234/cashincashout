@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { products, formatPrice } from "@/lib/products";
+import { formatPrice, type Product } from "@/lib/products";
 import { useUiStore } from "@/lib/ui-store";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
@@ -14,7 +14,7 @@ import { DUR_BASE, EASE_OUT_EXPO } from "@/components/motion-tokens";
  * Full-screen search. Live client-side filtering over the local catalog —
  * frontend-only demo, there is no search backend.
  */
-export function SearchOverlay() {
+export function SearchOverlay({ products }: { products: Product[] }) {
   const reduced = useReducedMotion();
   const open = useUiStore((s) => s.searchOpen);
   const setOpen = useUiStore((s) => s.setSearchOpen);
@@ -53,7 +53,7 @@ export function SearchOverlay() {
         p.slug.includes(q) ||
         p.id.includes(q),
     );
-  }, [query]);
+  }, [query, products]);
 
   return (
     <AnimatePresence>

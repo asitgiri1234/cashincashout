@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCartStore, selectSubtotal, type CartLine } from "@/lib/cart-store";
-import { getProductBySlug, formatPrice } from "@/lib/products";
+import { formatPrice, type Product } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { DUR_BASE, EASE_OUT_EXPO } from "@/components/motion-tokens";
@@ -13,12 +13,20 @@ import { DUR_BASE, EASE_OUT_EXPO } from "@/components/motion-tokens";
  * Cart drawer — slides in from the right over a blurred backdrop.
  * DEMO ONLY: the checkout button is intentionally disabled.
  */
-export function CartDrawer() {
+export function CartDrawer({ products }: { products: Product[] }) {
   const reduced = useReducedMotion();
   const open = useCartStore((s) => s.drawerOpen);
   const setOpen = useCartStore((s) => s.setDrawerOpen);
   const lines = useCartStore((s) => s.lines);
-  const subtotal = useCartStore(selectSubtotal);
+
+  // Cart lines store only slug/size/qty, so titles, prices and thumbnails
+  // are resolved against the live catalogue passed down from the server —
+  // not from the static file, or an edited price would never reach the cart.
+  const bySlug = new Map(products.map((p) => [p.slug, p]));
+  const subtotal = lines.reduce(
+    (sum, l) => sum + (bySlug.get(l.slug)?.price ?? 0) * l.qty,
+    0,
+  );
 
   const panelRef = useRef<HTMLDivElement>(null);
   useOverlayLock("cart-drawer", open);
@@ -83,7 +91,11 @@ export function CartDrawer() {
               <ul>
                 <AnimatePresence initial={false}>
                   {lines.map((line) => (
-                    <CartRow key={`${line.slug}/${line.size}`} line={line} />
+                    <CartRow
+                      key={`${line.slug}/${line.size}`}
+                      line={line}
+                      product={bySlug.get(line.slug)}
+                    />
                   ))}
                 </AnimatePresence>
               </ul>
@@ -143,11 +155,17 @@ export function CartDrawer() {
   );
 }
 
-function CartRow({ line }: { line: CartLine }) {
+function CartRow({
+  line,
+  product,
+}: {
+  line: CartLine;
+  product: Product | undefined;
+}) {
   const reduced = useReducedMotion();
   const remove = useCartStore((s) => s.remove);
   const setQty = useCartStore((s) => s.setQty);
-  const product = getProductBySlug(line.slug);
+  // A product can go to draft while it sits in someone's cart.
   if (!product) return null;
 
   return (

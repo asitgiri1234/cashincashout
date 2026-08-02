@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { products, getProductBySlug, formatPrice } from "@/lib/products";
+import { formatPrice } from "@/lib/products";
+import { getLiveProducts, getLiveSlugs, getProduct } from "@/lib/catalog";
 import { ProductGallery } from "@/components/product/product-gallery";
 import { PurchasePanel } from "@/components/product/purchase-panel";
 import { MoreStrip } from "@/components/product/more-strip";
 
-export function generateStaticParams() {
-  return products.map((p) => ({ slug: p.slug }));
+export async function generateStaticParams() {
+  const slugs = await getLiveSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -15,7 +17,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProduct(slug);
   if (!product) return {};
   return { title: product.title, description: product.description };
 }
@@ -26,7 +28,7 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getProduct(slug);
   if (!product) notFound();
 
   return (

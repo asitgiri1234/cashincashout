@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { products, formatPrice, type Product } from "@/lib/products";
+import { formatPrice, type Product } from "@/lib/products";
+import { getLiveProducts } from "@/lib/catalog";
 import { TransitionLink } from "@/components/view-transitions";
 
 /**
@@ -7,10 +8,11 @@ import { TransitionLink } from "@/components/view-transitions";
  * Server component; picks the next four in catalog order, wrapping around,
  * so every product page shows a different, deterministic set.
  */
-export function MoreStrip({ current }: { current: Product }) {
+export async function MoreStrip({ current }: { current: Product }) {
+  const products = await getLiveProducts();
   const i = products.findIndex((p) => p.slug === current.slug);
   const others = Array.from(
-    { length: 4 },
+    { length: Math.min(4, Math.max(0, products.length - 1)) },
     (_, k) => products[(i + k + 1) % products.length],
   );
 

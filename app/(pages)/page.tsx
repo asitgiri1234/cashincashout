@@ -1,5 +1,5 @@
 import { ProductGrid } from "@/components/catalog/product-grid";
-import { products } from "@/lib/products";
+import { getLiveProducts } from "@/lib/catalog";
 
 /**
  * Homepage — the catalogue.
@@ -8,7 +8,8 @@ import { products } from "@/lib/products";
  * (pages) route group so it picks up the fixed-header offset and the site
  * footer from that layout.
  */
-export default function Home() {
+export default async function Home() {
+  const products = await getLiveProducts();
   return (
     <>
       <h1 className="sr-only">CASH IN CASH OUT — catalogue</h1>
