@@ -33,7 +33,9 @@ export function ProductGrid({ products }: { products: Product[] }) {
 
   return (
     <section aria-label="Catalogue" className="px-5 pb-24 pt-8 md:px-8 md:pt-12">
-      <ul className="mx-auto grid max-w-[1800px] grid-cols-2 gap-x-4 gap-y-12 md:grid-cols-3 md:gap-x-8 md:gap-y-16 lg:grid-cols-4">
+      {/* Phones get ONE product per row, filling the screen, as on the live
+          Shopify store. Tablet and up keep the multi-column catalogue. */}
+      <ul className="mx-auto grid max-w-[1800px] grid-cols-1 gap-x-4 gap-y-16 md:grid-cols-3 md:gap-x-8 md:gap-y-16 lg:grid-cols-4">
         {products.map((product, i) => (
           <li key={product.id}>
             <TransitionLink
