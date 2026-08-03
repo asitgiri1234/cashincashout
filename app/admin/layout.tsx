@@ -38,13 +38,19 @@ export default function AdminLayout({
           </div>
 
           <nav className="meta flex items-center gap-5 text-[11px]">
-            <Link href="/admin" className="hover:text-text text-text-secondary">
+            <Link href="/admin" className="text-text-secondary hover:text-text">
               PRODUCTS
+            </Link>
+            <Link
+              href="/admin/orders"
+              className="text-text-secondary hover:text-text"
+            >
+              ORDERS
             </Link>
             <Link
               href="/"
               target="_blank"
-              className="hover:text-text text-text-secondary"
+              className="text-text-secondary hover:text-text"
             >
               VIEW STORE ↗
             </Link>

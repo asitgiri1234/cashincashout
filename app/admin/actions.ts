@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
-import { products, variants } from "@/lib/db/schema";
+import { orders, products, variants } from "@/lib/db/schema";
 import { ADMIN_COOKIE, isValidSession } from "@/lib/admin-auth";
 
 /**
@@ -103,6 +103,39 @@ export async function updateStock(
   revalidatePath("/admin");
   revalidatePath(`/admin/products/${productId}`);
 
+  return { ok: true };
+}
+
+export type OrderStatus =
+  | "pending"
+  | "paid"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "refunded";
+
+/**
+ * Move an order through fulfilment.
+ *
+ * `paid` will normally be set by the payment webhook rather than by hand;
+ * this exists for corrections and for orders taken outside the site.
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  const [row] = await db
+    .update(orders)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(orders.id, orderId))
+    .returning({ id: orders.id });
+
+  if (!row) return { ok: false, error: "Order not found." };
+
+  revalidatePath("/admin/orders");
+  revalidatePath(`/admin/orders/${orderId}`);
   return { ok: true };
 }
 
