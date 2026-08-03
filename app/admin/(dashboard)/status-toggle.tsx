@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 
-import { toggleStatus } from "./actions";
+import { toggleStatus } from "@/app/admin/actions";
 
 /**
  * Live/draft switch on the product list.

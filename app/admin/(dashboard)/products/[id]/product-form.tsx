@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { updateProduct } from "../../actions";
+import { updateProduct } from "@/app/admin/actions";
 
 const field =
   "meta w-full border border-border bg-surface px-3 py-2.5 text-[13px] text-text focus:border-text focus:outline-none";

@@ -4,9 +4,18 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 
+import { redirect } from "next/navigation";
+
 import { db } from "@/lib/db/client";
 import { orders, products, variants } from "@/lib/db/schema";
 import { ADMIN_COOKIE, isValidSession } from "@/lib/admin-auth";
+
+/** End the session and return to the login screen. */
+export async function signOut(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(ADMIN_COOKIE);
+  redirect("/admin/login");
+}
 
 /**
  * Every mutation calls this FIRST.

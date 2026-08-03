@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { updateOrderStatus, type OrderStatus } from "../../actions";
+import { updateOrderStatus, type OrderStatus } from "@/app/admin/actions";
 
 const FLOW: { value: OrderStatus; label: string }[] = [
   { value: "pending", label: "PENDING" },

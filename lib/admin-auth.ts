@@ -1,56 +1,41 @@
 /**
  * Admin access control.
  *
- * Deliberately small. There is exactly one admin (the founder) and one
- * developer, so this is a shared password rather than a user system.
+ * One account: the founder/developer. Credentials are checked against the
+ * pair below, and a login is ALWAYS required — in development too, so what
+ * you test locally is exactly what happens in production.
  *
- * Behaviour by environment:
- *
- *   development   open. No login prompt, so building and demoing locally
- *                 has zero friction.
- *   production    requires ADMIN_PASSWORD. If that variable is not set the
- *                 admin routes 404 — it FAILS CLOSED, so a missing config
- *                 can never leave a public write surface open.
- *
- * The session cookie holds an HMAC derived from the password, not the
- * password itself, so reading the cookie does not reveal the secret. Web
- * Crypto is used rather than node:crypto because middleware runs on the edge
- * runtime, which has no node:crypto.
+ * CREDENTIALS ARE COMMITTED TO THE REPOSITORY.
+ * That is a deliberate trade for a private repo and a demo store: it means
+ * /admin works the moment it deploys, with no environment configuration.
+ * Two consequences worth knowing:
+ *   - anyone with repository access can read the password
+ *   - git history keeps it forever, so changing the constant does not erase it
+ * Both env vars below override the constants, so the password can be moved
+ * out of the code later without a code change: set ADMIN_PASSWORD in Vercel
+ * and the committed value stops being used.
  */
 
 export const ADMIN_COOKIE = "cico_admin";
 
+/** Identity allowed in. Compared case-insensitively. */
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "asitkg03@gmail.com";
+
+/** Secret. Override in the environment to stop using the committed value. */
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "asitgiri1234";
+
 /**
- * Who will be allowed in once there is a real identity to check.
+ * Session value: HMAC-SHA256 over the admin email, keyed by the password.
+ * The cookie therefore never carries the password itself, and forging it
+ * requires knowing the password.
  *
- * NOT ENFORCED YET: an allowlist can only be consulted after authentication
- * establishes *who* is asking, and the password gate below proves possession
- * of a secret, not an identity. Wire this into `requireAdmin` when email
- * sign-in lands.
+ * Web Crypto rather than node:crypto because middleware runs on the edge
+ * runtime, which has no node:crypto.
  */
-export const ADMIN_EMAILS = [
-  "asitkg03@gmail.com", // developer
-  // founder@cashincashout.com — add the founder's real address
-] as const;
-
-/** Admin is reachable in dev always, and in prod only once a password is set. */
-export function isAdminEnabled(): boolean {
-  return process.env.NODE_ENV !== "production" || !!process.env.ADMIN_PASSWORD;
-}
-
-/** Dev skips the login entirely. */
-export function isAdminOpen(): boolean {
-  return process.env.NODE_ENV !== "production";
-}
-
-/**
- * Session value for a given password: HMAC-SHA256 over a fixed message,
- * keyed by the password. Forging it requires the password.
- */
-export async function sessionToken(password: string): Promise<string> {
+export async function sessionToken(): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(password),
+    new TextEncoder().encode(ADMIN_PASSWORD),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
@@ -58,14 +43,14 @@ export async function sessionToken(password: string): Promise<string> {
   const sig = await crypto.subtle.sign(
     "HMAC",
     key,
-    new TextEncoder().encode("cico-admin-session-v1"),
+    new TextEncoder().encode(`cico-admin:${ADMIN_EMAIL.toLowerCase()}`),
   );
   return [...new Uint8Array(sig)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
-/** Length-safe constant-time compare, so timing cannot leak the token. */
+/** Constant-time compare, so response timing cannot leak the token. */
 export function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -73,12 +58,20 @@ export function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** True when this cookie value corresponds to the configured password. */
+/** Both must match. Email is case-insensitive; the password is not. */
+export function verifyCredentials(email: string, password: string): boolean {
+  const emailOk =
+    email.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
+  const passwordOk = safeEqual(password, ADMIN_PASSWORD);
+  // Evaluate both before returning so a wrong email and a wrong password
+  // take the same path.
+  return emailOk && passwordOk;
+}
+
+/** True when this cookie corresponds to a real sign-in. */
 export async function isValidSession(
   cookieValue: string | undefined,
 ): Promise<boolean> {
-  if (isAdminOpen()) return true;
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password || !cookieValue) return false;
-  return safeEqual(cookieValue, await sessionToken(password));
+  if (!cookieValue) return false;
+  return safeEqual(cookieValue, await sessionToken());
 }

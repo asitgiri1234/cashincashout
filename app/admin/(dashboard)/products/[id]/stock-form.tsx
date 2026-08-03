@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { updateStock } from "../../actions";
+import { updateStock } from "@/app/admin/actions";
 
 /**
  * Stock per size.
