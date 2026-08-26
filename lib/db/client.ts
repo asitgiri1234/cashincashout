@@ -20,6 +20,19 @@ if (!url) {
 }
 
 /**
+ * Whether DATABASE_URL points at a transaction-mode connection pooler
+ * (PgBouncer, as fronted by Supabase's 6543 endpoint).
+ *
+ * An EXPLICIT flag, not a guess from the port or hostname: the port a pooler
+ * listens on is a deployment detail, self-hosted PgBouncer commonly runs on
+ * 5432, and a string match would silently disable prepared statements on a
+ * direct connection that merely looked pooled — or, worse, leave them enabled
+ * against a real pooler, where they fail only under load once connections
+ * start being reused across transactions.
+ */
+const pooled = process.env.DB_POOLED === "true";
+
+/**
  * Next's hot reload re-evaluates modules on every edit. Caching the client on
  * globalThis stops that opening a fresh pool each time and exhausting
  * Postgres' connection limit.
@@ -31,9 +44,11 @@ const globalForDb = globalThis as unknown as {
 const client =
   globalForDb.__cicoSql ??
   postgres(url, {
-    // Supabase's pooler runs PgBouncer in transaction mode, which does not
-    // support prepared statements. Harmless on a direct connection too.
-    prepare: false,
+    // PgBouncer in transaction mode does not support prepared statements —
+    // a statement prepared on one connection is not there when the next
+    // transaction lands on another. On a direct connection (local Postgres,
+    // or the 5432 endpoint) they are left ON, which is the faster path.
+    prepare: !pooled,
     // Serverless invocations are short-lived and numerous; a small ceiling
     // per instance keeps total connections sane.
     max: process.env.NODE_ENV === "production" ? 1 : 5,

@@ -8,18 +8,23 @@ Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · Framer Motion · Zus
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in DATABASE_URL
+cp .env.example .env.local   # then fill in DATABASE_URL and DIRECT_URL
 npm run dev                  # http://localhost:3000
 npm run build                # production build (all routes prerender)
 npm start                    # serve the production build
 ```
+
+See [Local Postgres](#local-postgres) for getting a database up before
+`npm run dev`.
 
 `NEXT_PUBLIC_SITE_URL` may be set to the deployed origin so Open Graph URLs
 resolve absolutely; it defaults to localhost.
 
 ## Database
 
-Supabase Postgres via [Drizzle](https://orm.drizzle.team).
+Postgres via [Drizzle](https://orm.drizzle.team) — a local server in
+development, hosted Postgres (Supabase) in production. The difference is
+entirely in `.env.local`; no schema or query code varies between them.
 
 ```bash
 npm run db:generate   # SQL migration from lib/db/schema.ts
@@ -58,12 +63,79 @@ replayed payment webhook cannot double-credit an order.
 
 ### Two connection strings
 
-Supabase gives you a **direct** URL (port 5432) and a **pooled** one (6543,
-PgBouncer). Migrations must use direct — PgBouncer in transaction mode cannot
-run some DDL. The deployed app must use pooled — serverless opens a
-connection per invocation and would exhaust the direct limit. `drizzle-kit`
-also runs outside Next, so `drizzle.config.ts` loads `.env.local` explicitly;
-Next loads it for the app on its own.
+Three variables carry the whole local/production difference:
+
+| Variable       | Read by                              | Local              | Production        |
+| -------------- | ------------------------------------ | ------------------ | ----------------- |
+| `DATABASE_URL` | the running app (`lib/db/client.ts`) | localhost:5432     | pooled, port 6543 |
+| `DIRECT_URL`   | migrations (`drizzle.config.ts`)     | localhost:5432     | direct, port 5432 |
+| `DB_POOLED`    | `lib/db/client.ts`                   | `false`            | `true`            |
+
+In production the two URLs must differ. Migrations must use **direct** —
+PgBouncer in transaction mode cannot run some DDL. The deployed app must use
+**pooled** — serverless opens a connection per invocation and would exhaust
+the direct limit.
+
+Locally there is no PgBouncer, so both strings are identical. They are still
+kept as two variables so nothing about production behaviour depends on the
+local setup: `DIRECT_URL` falls back to `DATABASE_URL` when unset, so a
+one-variable environment keeps working either way.
+
+`DB_POOLED` is what turns prepared statements off, and it is set
+**explicitly** rather than sniffed from the port. Self-hosted PgBouncer
+commonly listens on 5432, so matching on the port would disable prepared
+statements on a direct connection that merely looked pooled — or leave them
+enabled against a real pooler, where the failure appears only under load,
+once connections start being reused across transactions.
+
+`drizzle-kit` runs outside Next, so `drizzle.config.ts` loads `.env.local`
+explicitly; Next loads it for the app on its own.
+
+### Local Postgres
+
+Any Postgres 14+ works — the installer, Homebrew, or Docker. `POSTGRES_DB`
+creates the database on first start, so there is no separate `createdb`:
+
+```bash
+docker run --name cico-pg \
+  -e POSTGRES_PASSWORD=<password> -e POSTGRES_DB=cico \
+  -p 5434:5432 -d postgres:16-alpine
+
+docker start cico-pg   # after a reboot
+```
+
+**Pick a port nothing else is using.** 5432 is the Postgres default and the
+obvious choice, but it is a busy one — another project's container or a
+system-wide install may already hold it, and the failure looks like a
+password error against *your* database rather than a successful connection to
+someone else's. Check first:
+
+```bash
+docker ps --format '{{.Names}}\t{{.Ports}}'   # what's already published
+```
+
+Then point `.env.local` at whichever port you chose:
+
+```ini
+DATABASE_URL="postgresql://postgres:PASSWORD@localhost:5434/cico"
+DIRECT_URL="postgresql://postgres:PASSWORD@localhost:5434/cico"
+DB_POOLED="false"
+```
+
+Then build it out and verify:
+
+```bash
+npm run db:migrate   # apply the committed migrations
+npm run db:seed      # load the catalogue from lib/products.ts
+npx tsx --env-file=.env.local scripts/db-check.ts
+```
+
+`db-check` exits non-zero if the money round-trip is wrong, so it is a
+usable smoke test: BOOTS must read back as exactly `449900` paise.
+
+A password containing `@ : / ? # [ ] %` must be percent-encoded in the URL —
+an `@` becomes `%40`, or the parser splits on the wrong character and the
+host comes out wrong.
 
 ### Where the storefront gets its data
 
@@ -86,15 +158,27 @@ storefront immediately.
 
 ### Access
 
-| Environment | Behaviour                                                |
-| ----------- | -------------------------------------------------------- |
-| development | Open. No login, so local work has no friction.            |
-| production  | Requires `ADMIN_PASSWORD`. **Unset ⇒ `/admin` 404s.**     |
+A sign-in is **always required, in every environment** — including locally,
+so what you test is exactly what happens in production. An unauthenticated
+request to any `/admin` route redirects to `/admin/login` with the intended
+path in `?next=`; nothing 404s.
 
-It **fails closed**: forgetting the variable hides the dashboard rather than
-publishing an open write surface. The session cookie holds an HMAC derived
-from the password rather than the password itself, and is `httpOnly` so an
-XSS anywhere on the storefront cannot steal it.
+Sign-in takes an **email and a password**, checked against `ADMIN_EMAIL` and
+`ADMIN_PASSWORD`. Both have fallbacks committed in
+[`lib/admin-auth.ts`](lib/admin-auth.ts), so `/admin` works with neither
+variable set — a deliberate trade for a private repo and a demo store.
+Setting them in the environment overrides the committed pair, which is how
+the committed password stops being the live one.
+
+> **The fallback password is in the repository and in git history.** Changing
+> the constant does not erase it. Set `ADMIN_PASSWORD` in the deployment
+> environment before this is public.
+
+The session cookie holds an HMAC-SHA256 over the admin email keyed by the
+password, never the password itself, and is `httpOnly` so an XSS anywhere on
+the storefront cannot steal it. Credentials are compared in constant time,
+and a wrong email and a wrong password produce the same message — saying
+which was wrong would confirm whether an address is the admin's.
 
 > `middleware.ts` guards the admin *pages*. It is deliberately not the only
 > check — Server Actions are POST endpoints with stable ids that can be
@@ -102,23 +186,31 @@ XSS anywhere on the storefront cannot steal it.
 > action in `app/admin/actions.ts` calls `requireAdmin()` itself. Guarding
 > only the route would be decorative.
 
-`ADMIN_EMAILS` in [`lib/admin-auth.ts`](lib/admin-auth.ts) records who should
-be allowed in, but is **not enforced yet** — an allowlist can only be checked
-once authentication establishes *who* is asking, and a shared password proves
-possession of a secret, not an identity. Wire it in when email sign-in lands.
+`ADMIN_EMAIL` is now enforced as part of sign-in rather than being a record
+of intent: the login checks it case-insensitively alongside the password, so
+the credential identifies *who* is asking and not merely that someone holds a
+shared secret. It is still a single account — the founder/developer.
 
 ## Deploying
 
 Set in Vercel → Settings → Environment Variables:
 
-| Variable              | Notes                                                     |
-| --------------------- | --------------------------------------------------------- |
-| `DATABASE_URL`        | Use the **pooled** string (port 6543), not direct          |
-| `ADMIN_PASSWORD`      | Production only. Without it `/admin` 404s                  |
-| `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs              |
+| Variable              | Notes                                                      |
+| --------------------- | ---------------------------------------------------------- |
+| `DATABASE_URL`        | The **pooled** string (port 6543), not direct               |
+| `DIRECT_URL`          | The **direct** string (port 5432), for migrations           |
+| `DB_POOLED`           | `true` in production — `DATABASE_URL` is behind PgBouncer   |
+| `ADMIN_EMAIL`         | Overrides the committed fallback                            |
+| `ADMIN_PASSWORD`      | Overrides the committed fallback. Set a long random string  |
+| `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs               |
 
-Migrations are not run at deploy time — run `npm run db:migrate` yourself,
-against the **direct** connection, before shipping a schema change.
+`ADMIN_EMAIL` and `ADMIN_PASSWORD` are not optional in practice: leaving them
+unset does not disable `/admin`, it leaves the repository's committed
+credentials live.
+
+Migrations are not run at deploy time — run `npm run db:migrate` yourself
+before shipping a schema change. It uses `DIRECT_URL`, so it goes to the
+direct connection automatically.
 
 ## What is demo-only
 
