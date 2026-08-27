@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { formatPrice, type Product } from "@/lib/products";
+import { formatPrice, imageAlt, type Product } from "@/lib/products";
 import { getLiveProducts } from "@/lib/catalog";
 import { TransitionLink } from "@/components/view-transitions";
 
@@ -30,7 +30,7 @@ export async function MoreStrip({ current }: { current: Product }) {
             <div className="relative aspect-4/5 overflow-hidden">
               <Image
                 src={p.images[0]}
-                alt={p.title}
+                alt={imageAlt(p, 0)}
                 fill
                 sizes="280px"
                 className="object-contain transition-opacity duration-[var(--dur-fast)] ease-[var(--ease-out-expo)] group-hover:opacity-0"

@@ -22,6 +22,16 @@ import { BlobNotFoundError, del, put } from "@vercel/blob";
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /**
+ * Ceiling on images per product.
+ *
+ * Not a storage concern — it is a page-weight one. The product gallery
+ * renders every image in a scrolling stack and the mobile carousel snaps
+ * through all of them, so an accidental fifty-file drop would quietly make
+ * that page enormous. Twelve is far more than any product here needs.
+ */
+export const MAX_IMAGES_PER_PRODUCT = 12;
+
+/**
  * Formats we accept, mapped to the extension given to the stored object.
  *
  * The extension comes from the DETECTED type, never from the uploaded

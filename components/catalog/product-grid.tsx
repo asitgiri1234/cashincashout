@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback } from "react";
-import type { Product } from "@/lib/products";
+import { imageAlt, type Product } from "@/lib/products";
 import { TransitionLink } from "@/components/view-transitions";
 
 /**
@@ -51,7 +51,7 @@ export function ProductGrid({ products }: { products: Product[] }) {
                 <div data-morph className="absolute inset-0">
                   <Image
                     src={product.images[0]}
-                    alt={product.title}
+                    alt={imageAlt(product, 0)}
                     fill
                     // First row is above the fold on every breakpoint.
                     priority={i < 4}

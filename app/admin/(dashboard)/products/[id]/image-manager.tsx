@@ -58,6 +58,7 @@ export function ImageManager({
   initial,
   maxBytes,
   acceptedTypes,
+  maxImages,
 }: {
   productId: string;
   initial: AdminImage[];
@@ -65,6 +66,8 @@ export function ImageManager({
   maxBytes: number;
   /** From ALLOWED_IMAGE_TYPES, for the file picker and the pre-flight check. */
   acceptedTypes: string[];
+  /** From MAX_IMAGES_PER_PRODUCT. The server enforces it; this only warns. */
+  maxImages: number;
 }) {
   const reduced = useReducedMotion();
   const [images, setImages] = useState<AdminImage[]>(initial);
@@ -75,6 +78,9 @@ export function ImageManager({
   const [dragTo, setDragTo] = useState<number | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [pending, start] = useTransition();
+
+  const atCapacity = images.length >= maxImages;
+  const remaining = Math.max(0, maxImages - images.length);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const confirmTimer = useRef<number | undefined>(undefined);
@@ -317,12 +323,14 @@ export function ImageManager({
         onDragOver={(e) => {
           // Only react to files. A tile being dragged for reorder carries
           // no Files entry, and must not light this up.
+          if (atCapacity) return;
           if (!e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
           setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => {
+          if (atCapacity) return;
           if (!e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
           setDragOver(false);
@@ -333,16 +341,21 @@ export function ImageManager({
         }`}
       >
         <p className="meta text-[11px] tracking-[0.12em]">
-          DROP IMAGES HERE
+          {atCapacity ? "IMAGE LIMIT REACHED" : "DROP IMAGES HERE"}
         </p>
         <p className={`${label} mt-1.5`}>
-          JPEG · PNG · WEBP · AVIF — MAX {(maxBytes / 1048576).toFixed(0)} MB
+          {atCapacity
+            ? `${maxImages} IS THE MAXIMUM — DELETE ONE TO ADD ANOTHER`
+            : `JPEG · PNG · WEBP · AVIF — MAX ${(maxBytes / 1048576).toFixed(
+                0,
+              )} MB · ${remaining} SLOT${remaining === 1 ? "" : "S"} LEFT`}
         </p>
 
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="btn-press meta mt-4 border border-text px-4 py-2 text-[10px] tracking-[0.12em] hover:bg-text hover:text-bg"
+          disabled={atCapacity}
+          className="btn-press meta mt-4 border border-text px-4 py-2 text-[10px] tracking-[0.12em] hover:bg-text hover:text-bg disabled:cursor-not-allowed disabled:border-border disabled:text-text-secondary disabled:hover:bg-transparent disabled:hover:text-text-secondary"
         >
           BROWSE FILES
         </button>
@@ -516,9 +529,14 @@ export function ImageManager({
                       <button
                         type="button"
                         onClick={() => remove(img)}
+                        title={
+                          img.pathname
+                            ? "Deletes the row and the stored file. Not recoverable."
+                            : "This image is a file committed under /public. The row goes; the file stays. Restore with: npm run db:seed"
+                        }
                         className="meta border border-text bg-text px-1.5 py-1 text-[9px] tracking-[0.1em] text-bg"
                       >
-                        SURE?
+                        {img.pathname ? "SURE?" : "SURE? (RE-SEED)"}
                       </button>
                       <button
                         type="button"

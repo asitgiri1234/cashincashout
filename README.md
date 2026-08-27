@@ -99,10 +99,22 @@ creates the database on first start, so there is no separate `createdb`:
 ```bash
 docker run --name cico-pg \
   -e POSTGRES_PASSWORD=<password> -e POSTGRES_DB=cico \
-  -p 5434:5432 -d postgres:16-alpine
-
-docker start cico-pg   # after a reboot
+  -p 5434:5432 --restart unless-stopped -d postgres:16-alpine
 ```
+
+`--restart unless-stopped` is worth having: without it the container stays
+down after a reboot, and the first symptom is a **build failure**, not an
+obvious "database is off" message — `getLiveProducts` catches the connection
+error and quietly serves the static catalogue, so pages render with stale
+content and only `next build` fails outright. On an existing container:
+
+```bash
+docker update --restart unless-stopped cico-pg
+docker start cico-pg    # if it is currently down
+```
+
+Note this only covers the container. Docker Desktop itself still has to be
+running — enable **Start Docker Desktop when you sign in** in its settings.
 
 **Pick a port nothing else is using.** 5432 is the Postgres default and the
 obvious choice, but it is a busy one — another project's container or a

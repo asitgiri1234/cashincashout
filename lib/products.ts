@@ -30,7 +30,32 @@ export interface Product {
    * and the product page renders the whole array.
    */
   images: string[];
+  /**
+   * Alt text per image, index-aligned with `images`.
+   *
+   * May be shorter than `images`, or hold empty strings — the static
+   * catalogue supplies none at all. Never read this directly; call
+   * `imageAlt()`, which falls back to a title-derived description.
+   */
+  imageAlts: string[];
   description: string;
+}
+
+/**
+ * Alt text for image `n`.
+ *
+ * The admin's per-image alt field writes to `product_images.alt`, and this is
+ * what carries it to the storefront — without it that field would save
+ * happily and never render anywhere.
+ *
+ * The fallback reproduces exactly what the components hardcoded before alt
+ * text was editable, so a product with no alt text set renders identically to
+ * how it always did.
+ */
+export function imageAlt(product: Product, n: number): string {
+  const stored = product.imageAlts[n]?.trim();
+  if (stored) return stored;
+  return n === 0 ? product.title : `${product.title} — alternate view`;
 }
 
 const APPAREL_SIZES = ["S", "M", "L", "XL"];
@@ -56,7 +81,7 @@ export const DEFAULT_SIZE_BY_SCALE: Record<SizeScale, string> = {
 
 type ProductSeed = Omit<
   Product,
-  "id" | "sizes" | "soldOut" | "defaultSize" | "images"
+  "id" | "sizes" | "soldOut" | "defaultSize" | "images" | "imageAlts"
 > & {
   sizes?: string[];
   soldOut?: string[];
@@ -242,6 +267,9 @@ export const products: Product[] = LIVE_SLUGS.map((slug) => {
       { length: seed.imageCount ?? 2 },
       (_, n) => `/products/${seed.slug}-${n + 1}.png`,
     ),
+    // The static catalogue carries no alt text; imageAlt() derives it from
+    // the title, which is what these products have always rendered.
+    imageAlts: [],
   };
 });
 

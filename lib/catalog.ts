@@ -35,12 +35,13 @@ type Row = {
   pricePaise: number;
   isEstimated: boolean;
   scale: SizeScale;
-  images: { url: string; position: number }[];
+  images: { url: string; alt: string; position: number }[];
   variants: { sizeLabel: string; stock: number; position: number }[];
 };
 
 function rowToProduct(row: Row): Product {
   const ordered = [...row.variants].sort((a, b) => a.position - b.position);
+  const orderedImages = [...row.images].sort((a, b) => a.position - b.position);
   const sizes = ordered.map((v) => v.sizeLabel);
   const soldOut = ordered.filter((v) => v.stock <= 0).map((v) => v.sizeLabel);
 
@@ -63,9 +64,11 @@ function rowToProduct(row: Row): Product {
         return preferred;
       return sizes.find((s) => !soldOut.includes(s)) ?? sizes[0] ?? "";
     })(),
-    images: [...row.images]
-      .sort((a, b) => a.position - b.position)
-      .map((i) => i.url),
+    // Sorted once and split into two index-aligned arrays. The admin's alt
+    // text reaches the storefront through `imageAlts`; dropping it here is
+    // what previously made that field write-only.
+    images: orderedImages.map((i) => i.url),
+    imageAlts: orderedImages.map((i) => i.alt),
     description: row.description,
   };
 }

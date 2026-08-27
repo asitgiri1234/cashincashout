@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { formatPrice, type Product } from "@/lib/products";
+import { formatPrice, imageAlt, type Product } from "@/lib/products";
 import { useUiStore } from "@/lib/ui-store";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
@@ -117,7 +117,7 @@ export function SearchOverlay({ products }: { products: Product[] }) {
                         <div className="relative h-14 w-11 shrink-0">
                           <Image
                             src={p.images[0]}
-                            alt={p.title}
+                            alt={imageAlt(p, 0)}
                             fill
                             sizes="44px"
                             className="object-contain"

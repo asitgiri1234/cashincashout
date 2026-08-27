@@ -4,7 +4,11 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import { products } from "@/lib/db/schema";
-import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/storage";
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGES_PER_PRODUCT,
+  MAX_IMAGE_BYTES,
+} from "@/lib/storage";
 import { ImageManager } from "./image-manager";
 import { ProductForm } from "./product-form";
 import { StockForm } from "./stock-form";
@@ -70,6 +74,7 @@ export default async function EditProductPage({
           <ImageManager
             productId={product.id}
             maxBytes={MAX_IMAGE_BYTES}
+            maxImages={MAX_IMAGES_PER_PRODUCT}
             acceptedTypes={Object.keys(ALLOWED_IMAGE_TYPES)}
             initial={product.images.map((img) => ({
               id: img.id,

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCartStore, selectSubtotal, type CartLine } from "@/lib/cart-store";
-import { formatPrice, type Product } from "@/lib/products";
+import { formatPrice, imageAlt, type Product } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { DUR_BASE, EASE_OUT_EXPO } from "@/components/motion-tokens";
@@ -186,7 +186,7 @@ function CartRow({
         <div className="relative h-20 w-16 shrink-0">
           <Image
             src={product.images[0]}
-            alt={product.title}
+            alt={imageAlt(product, 0)}
             fill
             sizes="64px"
             className="object-contain"

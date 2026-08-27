@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import type { Product } from "@/lib/products";
+import { imageAlt, type Product } from "@/lib/products";
 import { useOverlayLock } from "@/components/ui-overlay-context";
 import { useFocusTrap } from "@/components/use-focus-trap";
 import { DUR_FAST, EASE_OUT_EXPO } from "@/components/motion-tokens";
@@ -52,7 +52,7 @@ export function ProductGallery({ product }: { product: Product }) {
             >
               <Image
                 src={src}
-                alt={i === 0 ? product.title : `${product.title} — alternate view`}
+                alt={imageAlt(product, i)}
                 fill
                 priority={i === 0}
                 sizes="100vw"
@@ -103,7 +103,7 @@ export function ProductGallery({ product }: { product: Product }) {
           >
             <Image
               src={src}
-              alt={i === 0 ? product.title : `${product.title} — alternate view`}
+              alt={imageAlt(product, i)}
               fill
               priority={i === 0}
               sizes="60vw"
@@ -121,6 +121,7 @@ export function ProductGallery({ product }: { product: Product }) {
 
       <Lightbox
         images={images}
+        alts={images.map((_, i) => imageAlt(product, i))}
         title={product.title}
         index={lightbox}
         onClose={() => setLightbox(null)}
@@ -136,12 +137,15 @@ export function ProductGallery({ product }: { product: Product }) {
 
 function Lightbox({
   images,
+  alts,
   title,
   index,
   onClose,
   onNavigate,
 }: {
   images: string[];
+  /** Index-aligned with `images`, already resolved through imageAlt(). */
+  alts: string[];
   title: string;
   index: number | null;
   onClose: () => void;
@@ -217,7 +221,7 @@ function Lightbox({
             >
               <Image
                 src={images[index ?? 0]}
-                alt={title}
+                alt={alts[index ?? 0] ?? title}
                 fill
                 sizes="100vw"
                 className="object-contain"

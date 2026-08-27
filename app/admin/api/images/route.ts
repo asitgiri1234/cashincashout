@@ -1,16 +1,24 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { ADMIN_COOKIE, isValidSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db/client";
 import { productImages, products } from "@/lib/db/schema";
 import {
+  MAX_IMAGES_PER_PRODUCT,
   deleteProductImage,
   isStorageError,
   uploadProductImage,
 } from "@/lib/storage";
+
+/**
+ * Thrown inside the insert transaction when the per-product ceiling is hit,
+ * so it unwinds through the same cleanup path as any other failure — the
+ * blob still has to be taken back out — but answers 400 rather than 500.
+ */
+class ImageLimitError extends Error {}
 
 /**
  * Product image upload.
@@ -72,6 +80,25 @@ export async function POST(req: Request) {
     );
   }
 
+  // Cheap pre-check, so hitting the ceiling does not cost an upload that is
+  // only going to be thrown away. The authoritative check is inside the
+  // transaction below, where the count cannot change underneath it.
+  const [{ count: existingCount }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productImages)
+    .where(eq(productImages.productId, product.id));
+
+  if (existingCount >= MAX_IMAGES_PER_PRODUCT) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "too_many_images",
+        error: `This product already has ${MAX_IMAGES_PER_PRODUCT} images, which is the maximum.`,
+      },
+      { status: 400 },
+    );
+  }
+
   // -- 1. validate and store the bytes ------------------------------------
   // StorageError carries a message already written for a human — "That image
   // is 6.0 MB. The limit is 5.0 MB." — so it is passed straight through
@@ -97,31 +124,47 @@ export async function POST(req: Request) {
   // hand. deleteProductImage is idempotent, which is what makes it safe to
   // call from a failure path.
   try {
-    const existing = await db
-      .select({ position: productImages.position })
-      .from(productImages)
-      .where(eq(productImages.productId, product.id));
+    const row = await db.transaction(async (tx) => {
+      // Serialise concurrent uploads for THIS product. Two browser tabs
+      // uploading at once would otherwise both read the same max(position)
+      // and insert a tie, leaving the gallery order ambiguous — and, at the
+      // top of the run, two rows both claiming to be the hero.
+      await tx
+        .select({ id: products.id })
+        .from(products)
+        .where(eq(products.id, product.id))
+        .for("update");
 
-    const nextPosition = existing.length
-      ? Math.max(...existing.map((r) => r.position)) + 1
-      : 0;
+      const existing = await tx
+        .select({ position: productImages.position })
+        .from(productImages)
+        .where(eq(productImages.productId, product.id));
 
-    const [row] = await db
-      .insert(productImages)
-      .values({
-        productId: product.id,
-        url: uploaded.url,
-        pathname: uploaded.pathname,
-        alt: "",
-        position: nextPosition,
-      })
-      .returning({
-        id: productImages.id,
-        url: productImages.url,
-        pathname: productImages.pathname,
-        alt: productImages.alt,
-        position: productImages.position,
-      });
+      if (existing.length >= MAX_IMAGES_PER_PRODUCT) throw new ImageLimitError();
+
+      const nextPosition = existing.length
+        ? Math.max(...existing.map((r) => r.position)) + 1
+        : 0;
+
+      const [inserted] = await tx
+        .insert(productImages)
+        .values({
+          productId: product.id,
+          url: uploaded.url,
+          pathname: uploaded.pathname,
+          alt: "",
+          position: nextPosition,
+        })
+        .returning({
+          id: productImages.id,
+          url: productImages.url,
+          pathname: productImages.pathname,
+          alt: productImages.alt,
+          position: productImages.position,
+        });
+
+      return inserted;
+    });
 
     revalidatePath("/");
     revalidatePath(`/product/${product.slug}`);
@@ -139,6 +182,19 @@ export async function POST(req: Request) {
         `[admin] orphaned blob ${uploaded.pathname}: the image row failed to ` +
           "save and the blob could not be removed either.",
         cleanupErr,
+      );
+    }
+
+    // Losing a race against the ceiling is the caller's mistake, not a
+    // server fault, and it deserves the specific reason.
+    if (err instanceof ImageLimitError) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "too_many_images",
+          error: `This product already has ${MAX_IMAGES_PER_PRODUCT} images, which is the maximum.`,
+        },
+        { status: 400 },
       );
     }
 

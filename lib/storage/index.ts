@@ -13,6 +13,7 @@ import "server-only";
  */
 export {
   ALLOWED_IMAGE_TYPES,
+  MAX_IMAGES_PER_PRODUCT,
   MAX_IMAGE_BYTES,
   StorageError,
   deleteProductImage,
