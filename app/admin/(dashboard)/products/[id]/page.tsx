@@ -1,10 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import { products } from "@/lib/db/schema";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/lib/storage";
+import { ImageManager } from "./image-manager";
 import { ProductForm } from "./product-form";
 import { StockForm } from "./stock-form";
 
@@ -63,6 +64,22 @@ export default async function EditProductPage({
             }}
           />
 
+          {/* The upload limit and the accepted formats are defined once, in
+              lib/storage, and handed down — so the picker, the client-side
+              pre-flight check and the server can never disagree about them. */}
+          <ImageManager
+            productId={product.id}
+            maxBytes={MAX_IMAGE_BYTES}
+            acceptedTypes={Object.keys(ALLOWED_IMAGE_TYPES)}
+            initial={product.images.map((img) => ({
+              id: img.id,
+              url: img.url,
+              pathname: img.pathname,
+              alt: img.alt,
+              position: img.position,
+            }))}
+          />
+
           <StockForm
             productId={product.id}
             variants={product.variants.map((v) => ({
@@ -73,33 +90,19 @@ export default async function EditProductPage({
           />
         </div>
 
-        {/* Images are read-only for now: uploads need blob storage, which is
-            a separate piece of work. */}
         <aside>
-          <h2 className="meta text-[10px] text-text-secondary">
-            IMAGES ({product.images.length})
+          <h2 className="meta text-[10px] tracking-[0.12em] text-text-secondary">
+            NOTES
           </h2>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {product.images.map((img, n) => (
-              <div key={img.id} className="border border-border p-2">
-                <div className="relative aspect-4/5 bg-surface">
-                  <Image
-                    src={img.url}
-                    alt=""
-                    fill
-                    sizes="150px"
-                    className="object-contain"
-                  />
-                </div>
-                <p className="meta mt-1 truncate text-[9px] text-text-secondary">
-                  {n === 0 ? "HERO" : `ALT ${n}`}
-                </p>
-              </div>
-            ))}
-          </div>
+          <p className="meta mt-2 text-[10px] leading-relaxed text-text-secondary">
+            THE FIRST IMAGE IS THE STOREFRONT HERO — IT IS WHAT THE CATALOGUE
+            GRID SHOWS AND WHAT THE PRODUCT PAGE MORPHS INTO. REORDER TO CHANGE
+            IT.
+          </p>
           <p className="meta mt-3 text-[10px] leading-relaxed text-text-secondary">
-            UPLOADING IS NOT WIRED UP YET — IT NEEDS BLOB STORAGE. FILES LIVE IN
-            /PUBLIC/PRODUCTS FOR NOW.
+            IMAGES SEEDED FROM THE STATIC CATALOGUE LIVE IN /PUBLIC/PRODUCTS AND
+            HAVE NO BLOB BEHIND THEM. DELETING ONE REMOVES THE ROW; THE FILE
+            STAYS IN THE REPOSITORY.
           </p>
         </aside>
       </div>

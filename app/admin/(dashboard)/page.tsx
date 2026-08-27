@@ -26,6 +26,9 @@ export default async function AdminProductsPage() {
     (n, r) => n + r.variants.filter((v) => v.stock <= 0).length,
     0,
   );
+  // A product page renders a gallery and a hover crossfade, so anything under
+  // two photos is visibly unfinished on the storefront.
+  const needPhotos = rows.filter((r) => r.images.length < 2).length;
 
   return (
     <>
@@ -34,7 +37,7 @@ export default async function AdminProductsPage() {
           <h1 className="text-[22px]">PRODUCTS</h1>
           <p className="meta mt-1 text-[11px] text-text-secondary">
             {rows.length} PRODUCTS · {live} LIVE · {outOfStock} SIZES OUT OF
-            STOCK
+            STOCK · {needPhotos} NEED PHOTOGRAPHY
           </p>
         </div>
       </div>
@@ -46,6 +49,7 @@ export default async function AdminProductsPage() {
               <th className="w-[64px] px-3 py-3 text-left font-normal"></th>
               <th className="px-3 py-3 text-left font-normal">PRODUCT</th>
               <th className="px-3 py-3 text-right font-normal">PRICE</th>
+              <th className="px-3 py-3 text-left font-normal">IMAGES</th>
               <th className="px-3 py-3 text-left font-normal">STOCK BY SIZE</th>
               <th className="px-3 py-3 text-left font-normal">STATUS</th>
               <th className="px-3 py-3 text-right font-normal"></th>
@@ -91,6 +95,26 @@ export default async function AdminProductsPage() {
                       <span className="ml-1 text-[9px] text-text-secondary">
                         EST
                       </span>
+                    )}
+                  </td>
+
+                  <td className="px-3 py-3">
+                    <span
+                      title={`${p.images.length} image(s)`}
+                      className={`meta border px-1.5 py-0.5 text-[10px] ${
+                        p.images.length === 0
+                          ? "border-text bg-text text-bg"
+                          : p.images.length < 2
+                            ? "border-text text-text"
+                            : "border-border text-text-secondary"
+                      }`}
+                    >
+                      {p.images.length}
+                    </span>
+                    {p.images.length < 2 && (
+                      <p className="meta mt-1 text-[9px] text-text-secondary">
+                        {p.images.length === 0 ? "NONE" : "NEEDS MORE"}
+                      </p>
                     )}
                   </td>
 
