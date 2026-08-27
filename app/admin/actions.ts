@@ -372,3 +372,71 @@ export async function deleteProductImageById(
   revalidateProduct(productId, await productSlug(productId));
   return { ok: true };
 }
+
+/**
+ * Delete a product, its images, its variants — and its blobs.
+ *
+ * The foreign keys cascade rows away for us, which is exactly the trap:
+ * product_images rows vanish with the product, and with them the only record
+ * of which blobs belonged to it. Nothing would ever reference those files
+ * again and nothing would know to remove them. So the pathnames are read
+ * BEFORE the delete, and the blobs are removed after it.
+ *
+ * Order is row-first for the same reason as deleteProductImageById: an
+ * orphaned file is invisible and costs a fraction of a cent, while a row
+ * pointing at a deleted blob is a broken image on the live store.
+ *
+ * ORDER HISTORY SURVIVES. order_items.variant_id is ON DELETE SET NULL, and
+ * the title, size and unit price on each line are snapshots taken at
+ * purchase — so past orders keep reading correctly for a product that no
+ * longer exists, which is the whole reason those columns are snapshots.
+ */
+export async function deleteProduct(productId: string): Promise<ActionResult> {
+  await requireAdmin();
+
+  const [product] = await db
+    .select({ id: products.id, slug: products.slug })
+    .from(products)
+    .where(eq(products.id, productId));
+
+  if (!product) return { ok: false, error: "That product no longer exists." };
+
+  // Read first — after the delete this list is unrecoverable.
+  const owned = await db
+    .select({ pathname: productImages.pathname })
+    .from(productImages)
+    .where(eq(productImages.productId, productId));
+
+  const pathnames = owned
+    .map((r) => r.pathname)
+    .filter((p): p is string => Boolean(p));
+
+  await db.delete(products).where(eq(products.id, productId));
+
+  // Best effort, and deliberately not fatal: the product is already gone, so
+  // reporting failure would be a false negative and invite a retry that can
+  // no longer find anything. Anything left behind is logged, and
+  // scripts/blob-orphans.ts is the backstop.
+  const failed: string[] = [];
+  for (const pathname of pathnames) {
+    try {
+      await deleteProductImage(pathname);
+    } catch {
+      failed.push(pathname);
+    }
+  }
+
+  if (failed.length > 0) {
+    console.error(
+      `[admin] product ${product.slug} deleted, but ${failed.length} blob(s) ` +
+        `could not be removed and are now orphaned: ${failed.join(", ")}. ` +
+        "Run: npx tsx --env-file=.env.local scripts/blob-orphans.ts",
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/product/${product.slug}`);
+  revalidatePath("/admin");
+
+  return { ok: true };
+}

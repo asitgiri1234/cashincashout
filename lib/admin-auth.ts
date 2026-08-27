@@ -1,28 +1,54 @@
 /**
  * Admin access control.
  *
- * One account: the founder/developer. Credentials are checked against the
- * pair below, and a login is ALWAYS required — in development too, so what
- * you test locally is exactly what happens in production.
+ * One account: the founder/developer. A login is ALWAYS required — in
+ * development too, so what you test locally is exactly what happens in
+ * production.
  *
- * CREDENTIALS ARE COMMITTED TO THE REPOSITORY.
- * That is a deliberate trade for a private repo and a demo store: it means
- * /admin works the moment it deploys, with no environment configuration.
- * Two consequences worth knowing:
- *   - anyone with repository access can read the password
- *   - git history keeps it forever, so changing the constant does not erase it
- * Both env vars below override the constants, so the password can be moved
- * out of the code later without a code change: set ADMIN_PASSWORD in Vercel
- * and the committed value stops being used.
+ * THE PASSWORD IS NO LONGER COMMITTED. It used to be, and that value must be
+ * treated as compromised: it is permanently in git history, readable by
+ * anyone who has ever had a clone, and rewriting history would not recall the
+ * copies. See README → Admin.
+ *
+ * ADMIN_PASSWORD is now REQUIRED. With it unset there is no usable password
+ * at all: the fallback below is random bytes generated at module load, which
+ * nobody — including this process — can reproduce or type. That is
+ * deliberate. The previous design failed OPEN, because forgetting the
+ * variable silently left the repository's own password live; this one fails
+ * CLOSED, refusing every sign-in until a real secret is configured.
  */
 
 export const ADMIN_COOKIE = "cico_admin";
 
-/** Identity allowed in. Compared case-insensitively. */
+/** Identity allowed in. Compared case-insensitively. Not a secret. */
 export const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "asitkg03@gmail.com";
 
-/** Secret. Override in the environment to stop using the committed value. */
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "asitgiri1234";
+/**
+ * An unguessable value, so an unconfigured deployment authenticates nobody
+ * rather than authenticating everybody who has read the repository.
+ *
+ * Regenerated per process, so it also cannot be pinned down by observing one
+ * instance. Sessions issued against it do not survive a restart — irrelevant,
+ * since no one can sign in to obtain one.
+ */
+function unusablePassword(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** True when the deployment has no admin password configured. */
+export const ADMIN_PASSWORD_CONFIGURED = Boolean(process.env.ADMIN_PASSWORD);
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? unusablePassword();
+
+if (!ADMIN_PASSWORD_CONFIGURED) {
+  console.error(
+    "[admin] ADMIN_PASSWORD is not set. /admin will refuse every sign-in. " +
+      "Set it in .env.local for development, and in the deployment " +
+      "environment for production. See .env.example.",
+  );
+}
 
 /**
  * Session value: HMAC-SHA256 over the admin email, keyed by the password.
@@ -60,6 +86,11 @@ export function safeEqual(a: string, b: string): boolean {
 
 /** Both must match. Email is case-insensitive; the password is not. */
 export function verifyCredentials(email: string, password: string): boolean {
+  // Explicit, rather than relying on nobody guessing the random fallback.
+  // Same answer, but it states the intent and cannot be weakened by a later
+  // change to how the fallback is generated.
+  if (!ADMIN_PASSWORD_CONFIGURED) return false;
+
   const emailOk =
     email.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
   const passwordOk = safeEqual(password, ADMIN_PASSWORD);

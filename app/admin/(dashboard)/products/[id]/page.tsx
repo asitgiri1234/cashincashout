@@ -9,6 +9,7 @@ import {
   MAX_IMAGES_PER_PRODUCT,
   MAX_IMAGE_BYTES,
 } from "@/lib/storage";
+import { DeleteProduct } from "./delete-product";
 import { ImageManager } from "./image-manager";
 import { ProductForm } from "./product-form";
 import { StockForm } from "./stock-form";
@@ -109,6 +110,15 @@ export default async function EditProductPage({
             HAVE NO BLOB BEHIND THEM. DELETING ONE REMOVES THE ROW; THE FILE
             STAYS IN THE REPOSITORY.
           </p>
+
+          <div className="mt-8 border-t border-border pt-6">
+            <h2 className="meta text-[10px] tracking-[0.12em] text-text-secondary">
+              DANGER ZONE
+            </h2>
+            <div className="mt-3">
+              <DeleteProduct productId={product.id} slug={product.slug} />
+            </div>
+          </div>
         </aside>
       </div>
     </>

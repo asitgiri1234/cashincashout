@@ -6,12 +6,36 @@ import { eq, sql } from "drizzle-orm";
 import { ADMIN_COOKIE, isValidSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db/client";
 import { productImages, products } from "@/lib/db/schema";
+import { rateLimit } from "@/lib/rate-limit";
 import {
   MAX_IMAGES_PER_PRODUCT,
+  MAX_IMAGE_BYTES,
   deleteProductImage,
   isStorageError,
   uploadProductImage,
 } from "@/lib/storage";
+
+/**
+ * Upload quota per admin session.
+ *
+ * Sized for a human filling in a product's gallery — twelve is the per-product
+ * ceiling, so this allows several products' worth in a burst — while stopping
+ * a loop that retries forever from quietly filling the blob store. See
+ * lib/rate-limit.ts for what this does and does not defend against.
+ */
+const UPLOAD_LIMIT = 40;
+const UPLOAD_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * Ceiling on the whole request body, checked before anything is read.
+ *
+ * The per-file limit cannot do this job: it is measured after
+ * req.formData() has already buffered the entire body, so by the time an
+ * oversized file is rejected it has been received in full. Multipart framing
+ * and the productId field add a little over the file itself, hence the
+ * headroom.
+ */
+const MAX_BODY_BYTES = MAX_IMAGE_BYTES + 64 * 1024;
 
 /**
  * Thrown inside the insert transaction when the per-product ceiling is hit,
@@ -41,10 +65,44 @@ export const runtime = "nodejs";
 /** One file per request, so each upload reports its own progress and error. */
 export async function POST(req: Request) {
   const jar = await cookies();
-  if (!(await isValidSession(jar.get(ADMIN_COOKIE)?.value))) {
+  const session = jar.get(ADMIN_COOKIE)?.value;
+
+  if (!(await isValidSession(session))) {
     return NextResponse.json(
       { ok: false, error: "Your session has expired. Reload and sign in." },
       { status: 401 },
+    );
+  }
+
+  // Refuse an oversized body before reading a byte of it. Content-Length can
+  // be omitted or lied about, so this is an early exit and not the real
+  // check — uploadProductImage still measures the actual bytes.
+  const declaredLength = Number(req.headers.get("content-length") ?? "");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "file_too_large",
+        error: `That image is ${(declaredLength / 1048576).toFixed(
+          1,
+        )} MB. The limit is ${(MAX_IMAGE_BYTES / 1048576).toFixed(1)} MB.`,
+      },
+      { status: 413 },
+    );
+  }
+
+  // Counted only after authentication, so an anonymous flood cannot exhaust
+  // the real admin's quota. Keyed by session: the cookie is an HMAC, not the
+  // password, so it is safe to use as a map key.
+  const quota = rateLimit(`upload:${session}`, UPLOAD_LIMIT, UPLOAD_WINDOW_MS);
+  if (!quota.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: "rate_limited",
+        error: `Too many uploads. Try again in ${quota.retryAfterSeconds} seconds.`,
+      },
+      { status: 429, headers: { "retry-after": String(quota.retryAfterSeconds) } },
     );
   }
 

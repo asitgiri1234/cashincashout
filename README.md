@@ -176,15 +176,32 @@ request to any `/admin` route redirects to `/admin/login` with the intended
 path in `?next=`; nothing 404s.
 
 Sign-in takes an **email and a password**, checked against `ADMIN_EMAIL` and
-`ADMIN_PASSWORD`. Both have fallbacks committed in
-[`lib/admin-auth.ts`](lib/admin-auth.ts), so `/admin` works with neither
-variable set — a deliberate trade for a private repo and a demo store.
-Setting them in the environment overrides the committed pair, which is how
-the committed password stops being the live one.
+`ADMIN_PASSWORD`.
 
-> **The fallback password is in the repository and in git history.** Changing
-> the constant does not erase it. Set `ADMIN_PASSWORD` in the deployment
-> environment before this is public.
+> ### ⚠️ The previously committed password is compromised
+>
+> `lib/admin-auth.ts` used to carry a real password as a fallback. It is
+> **permanently in git history** — readable by anyone who has ever cloned
+> this repository, and present in every existing clone and fork. Rewriting
+> history would not recall those copies.
+>
+> **Treat that password as public. Never reuse it here or anywhere else**,
+> especially if it was shared with any other account.
+
+**`ADMIN_PASSWORD` is now required.** Unset, `/admin` refuses every sign-in:
+the fallback is random bytes generated per process that nobody can reproduce
+or type. The old design failed *open* — forgetting the variable left the
+repository's own password live — and this one fails *closed*.
+
+Generate one and set it in `.env.local` for development and in the
+deployment environment for production:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+```
+
+`ADMIN_EMAIL` is the identity checked alongside it, case-insensitively. It is
+not a secret and keeps a sensible default.
 
 The session cookie holds an HMAC-SHA256 over the admin email keyed by the
 password, never the password itself, and is `httpOnly` so an XSS anywhere on
@@ -212,8 +229,8 @@ Set in Vercel → Settings → Environment Variables:
 | `DATABASE_URL`        | The **pooled** string (port 6543), not direct               |
 | `DIRECT_URL`          | The **direct** string (port 5432), for migrations           |
 | `DB_POOLED`           | `true` in production — `DATABASE_URL` is behind PgBouncer   |
-| `ADMIN_EMAIL`         | Overrides the committed fallback                            |
-| `ADMIN_PASSWORD`      | Overrides the committed fallback. Set a long random string  |
+| `ADMIN_EMAIL`         | Optional. Identity checked at sign-in; not a secret          |
+| `ADMIN_PASSWORD`      | **Required.** Long random string. Unset ⇒ nobody can sign in |
 | `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs               |
 | `BLOB_READ_WRITE_TOKEN`| Vercel Blob. Injected automatically once the store is linked|
 
@@ -227,9 +244,25 @@ to be replaced rather than converted. Verify credentials with:
 npx tsx --env-file=.env.local scripts/blob-check.ts
 ```
 
-`ADMIN_EMAIL` and `ADMIN_PASSWORD` are not optional in practice: leaving them
-unset does not disable `/admin`, it leaves the repository's committed
-credentials live.
+Without `ADMIN_PASSWORD` the dashboard is unreachable rather than open — the
+deployment fails closed, and the server logs a loud error at startup.
+
+### Housekeeping
+
+Blob storage and the database can drift apart: they are separate systems with
+no shared transaction, so a crash between the two writes leaves a file with no
+row, or a row with no file. Reconcile them:
+
+```bash
+npx tsx --env-file=.env.local scripts/blob-orphans.ts            # report only
+npx tsx --env-file=.env.local scripts/blob-orphans.ts --delete   # remove orphaned blobs
+```
+
+It reports both directions and removes nothing without an explicit flag.
+Deleting a *row* is a separate `--delete-rows`, because unlike an orphaned
+file that changes what customers see. Blobs younger than the grace window
+(`--grace=60`, minutes) are never touched — an upload writes the blob before
+the row, so a recent one legitimately has no row yet.
 
 Migrations are not run at deploy time — run `npm run db:migrate` yourself
 before shipping a schema change. It uses `DIRECT_URL`, so it goes to the
