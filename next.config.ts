@@ -14,6 +14,27 @@ const nextConfig: NextConfig = {
    * The navigation morph is implemented directly instead — see
    * components/view-transitions.tsx.
    */
+
+  images: {
+    /**
+     * Uploaded product images live in Vercel Blob, which serves them from
+     * <storeId>.public.blob.vercel-storage.com. next/image refuses any remote
+     * host not listed here — that allowlist is what stops the optimizer being
+     * used as an open proxy for arbitrary URLs.
+     *
+     * The store id is part of the hostname and differs per environment, so it
+     * is wildcarded rather than hardcoded; the suffix still pins this to
+     * Vercel Blob. Locally served images under /public are unaffected —
+     * remotePatterns only governs absolute URLs.
+     */
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**.public.blob.vercel-storage.com",
+        pathname: "/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

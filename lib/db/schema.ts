@@ -102,12 +102,33 @@ export const productImages = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
+    /** Public URL actually rendered by next/image. */
     url: text("url").notNull(),
+    /**
+     * Blob store key — what deletion needs, since the public URL is not an
+     * address the store accepts.
+     *
+     * NULLABLE ON PURPOSE. Rows seeded from lib/products.ts point at static
+     * files committed under /public and have no blob behind them; null is
+     * "not a blob, nothing to delete", which a caller must check before
+     * calling deleteProductImage. Making it NOT NULL would also have failed
+     * this migration outright against a table that already has rows.
+     */
+    pathname: text("pathname"),
     alt: text("alt").notNull().default(""),
     /** 0 is the hero: grid card, thumbnails, view-transition morph target. */
     position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (t) => [index("product_images_product_idx").on(t.productId, t.position)],
+  (t) => [
+    index("product_images_product_idx").on(t.productId, t.position),
+    // One row per blob. Two rows sharing a key would mean deleting either
+    // one silently breaks the other's image. Postgres allows many NULLs
+    // under a unique index, so the static rows above are unaffected.
+    uniqueIndex("product_images_pathname_idx").on(t.pathname),
+  ],
 );
 
 /**

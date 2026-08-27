@@ -203,6 +203,17 @@ Set in Vercel → Settings → Environment Variables:
 | `ADMIN_EMAIL`         | Overrides the committed fallback                            |
 | `ADMIN_PASSWORD`      | Overrides the committed fallback. Set a long random string  |
 | `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs               |
+| `BLOB_READ_WRITE_TOKEN`| Vercel Blob. Injected automatically once the store is linked|
+
+The Blob store must be created with **public** access. Product images are
+served straight to browsers by next/image, and a private store issues only
+expiring signed URLs — which would be baked into prerendered HTML and then
+go stale. A store's access mode is fixed at creation, so a private one has
+to be replaced rather than converted. Verify credentials with:
+
+```bash
+npx tsx --env-file=.env.local scripts/blob-check.ts
+```
 
 `ADMIN_EMAIL` and `ADMIN_PASSWORD` are not optional in practice: leaving them
 unset does not disable `/admin`, it leaves the repository's committed
