@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 /**
  * CICO commerce schema.
@@ -169,14 +169,118 @@ export const customers = pgTable(
   "customers",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    /**
+     * ALWAYS STORED LOWERCASE. Normalise with `normaliseEmail()` in
+     * lib/auth/otp.ts on every write — the index below enforces it, but the
+     * application is what keeps the stored value tidy.
+     */
     email: text("email").notNull(),
+    /**
+     * When this address last proved it could receive mail, via OTP. Null
+     * means unverified: a guest checkout creates no customer row at all, but
+     * an address collected some other way may sit here unproven.
+     */
+    emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     name: text("name"),
     phone: text("phone"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    /** Updated on each successful OTP verification. */
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("customers_email_idx").on(t.email)],
+  (t) => [
+    uniqueIndex("customers_email_idx").on(t.email),
+    /**
+     * Case-insensitive uniqueness.
+     *
+     * The index above is on the raw text, so "A@Example.com" and
+     * "a@example.com" would be two different customers — which for OTP login
+     * means an address can end up unable to reach the account it already
+     * has. A functional index rather than citext: no extension to install,
+     * the column stays `text` (orders.customer_id references this table),
+     * and the rule is enforced by the database instead of by convention.
+     */
+    uniqueIndex("customers_email_lower_idx").on(sql`lower(${t.email})`),
+  ],
+);
+
+/* -------------------------------------------------------------------------
+   CUSTOMER AUTHENTICATION
+
+   Email + one-time code. No passwords: nothing to leak, nothing to reuse
+   across sites, and nothing for a customer to forget.
+   ------------------------------------------------------------------------- */
+
+/**
+ * Issued one-time codes.
+ *
+ * KEYED BY EMAIL, NOT BY CUSTOMER. Requesting a code must not depend on
+ * whether an account exists — looking one up would make the two cases
+ * distinguishable by timing and by what gets written. The customer row is
+ * created on successful verification instead. See lib/auth/otp.ts.
+ *
+ * The plaintext code is NEVER stored. `codeHash` is an HMAC keyed by a server
+ * secret, so a database compromise alone does not yield usable codes: a plain
+ * digest of a six-digit number is a million guesses, which is no protection
+ * at all.
+ */
+export const otpCodes = pgTable(
+  "otp_codes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /** Lowercased on write, like customers.email. */
+    email: text("email").notNull(),
+    codeHash: text("code_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Set once the code is successfully redeemed. Null while still usable. */
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    /** Failed verifications. Five and the code is dead. */
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** For per-IP rate limiting and abuse investigation. */
+    requestIp: text("request_ip"),
+  },
+  (t) => [
+    index("otp_codes_email_expires_idx").on(t.email, t.expiresAt),
+    // Per-IP rate limiting counts rows in a time window; without this it
+    // would be a sequential scan on every code request.
+    index("otp_codes_ip_created_idx").on(t.requestIp, t.createdAt),
+  ],
+);
+
+/**
+ * Logged-in customer sessions.
+ *
+ * Like otp_codes, only a hash is stored: the cookie holds the secret, the
+ * database holds something useless to anyone who steals it.
+ */
+export const customerSessions = pgTable(
+  "customer_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    userAgent: text("user_agent"),
+  },
+  (t) => [
+    // Unique, not merely indexed: a token identifies exactly one session, and
+    // two rows sharing one would be a bug worth failing on rather than
+    // resolving arbitrarily.
+    uniqueIndex("customer_sessions_token_idx").on(t.tokenHash),
+    index("customer_sessions_customer_idx").on(t.customerId),
+  ],
 );
 
 /* -------------------------------------------------------------------------
@@ -277,7 +381,18 @@ export const variantsRelations = relations(variants, ({ one, many }) => ({
 
 export const customersRelations = relations(customers, ({ many }) => ({
   orders: many(orders),
+  sessions: many(customerSessions),
 }));
+
+export const customerSessionsRelations = relations(
+  customerSessions,
+  ({ one }) => ({
+    customer: one(customers, {
+      fields: [customerSessions.customerId],
+      references: [customers.id],
+    }),
+  }),
+);
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   customer: one(customers, {

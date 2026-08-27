@@ -41,6 +41,7 @@ npm run db:studio     # browse the data
 | `lib/db/migrations/`  | Generated SQL. Committed; never hand-edited        |
 | `scripts/seed.ts`     | Ports the hardcoded catalogue into the database    |
 | `scripts/db-check.ts` | Read-back sanity check                             |
+| `scripts/otp-check.ts`| End-to-end check of customer sign-in               |
 
 ### Three rules the schema is built around
 
@@ -220,6 +221,57 @@ of intent: the login checks it case-insensitively alongside the password, so
 the credential identifies *who* is asking and not merely that someone holds a
 shared secret. It is still a single account — the founder/developer.
 
+## Customer sign-in
+
+Email one-time codes, no passwords: nothing to leak, nothing reused from
+another site, nothing to forget. `lib/auth/otp.ts` is the whole core —
+generation, verification and sessions. There is no UI and no mail sending
+yet; `requestOtp` returns the plaintext code for a caller to deliver.
+
+```bash
+npx tsx --env-file=.env.local scripts/otp-check.ts
+```
+
+`OTP_SECRET` is the HMAC key. **Codes and session tokens are never stored** —
+only an HMAC of them, keyed by that secret and bound to the email address, so
+reading the database yields nothing usable and a code issued for one address
+cannot be replayed against another. A plain digest would not do: six digits is
+a million guesses and exhaustible in milliseconds.
+
+Changing `OTP_SECRET` invalidates every outstanding code and every customer
+session at once — which is the lever to pull if it ever leaks.
+
+| Rule | Value |
+| ---- | ----- |
+| Code length | 6 digits, uniformly random |
+| Expiry | 10 minutes |
+| Attempts per code | 5, then the code is dead |
+| Codes per address | 5 per hour, minimum 60s apart |
+| Codes per IP | 10 per hour |
+| Session lifetime | 30 days |
+
+Rate limits are **database-backed**, counted from `otp_codes` itself rather
+than in memory. `lib/rate-limit.ts` (the admin upload limiter) is per-process
+and would multiply across serverless instances and reset on deploy — fine for
+stopping an upload loop, wrong for limiting mail sent to a stranger's inbox.
+
+### Enumeration safety
+
+`requestOtp` never touches the `customers` table. Not as a precaution, as the
+design: checking for an existing account would differ in timing and in what
+it writes, and either turns a login form into a tool for testing whether an
+address shops here. The customer row is created on successful *verification*
+instead, so the request path is identical for a stranger and a regular.
+
+The corollary is for callers: **return the same response to the user whether
+`requestOtp` succeeded or was rate limited.** The structured failures it
+returns are for logs and server decisions, not for rendering next to the
+form. Every verification failure already shares one message; the distinct
+`code` values are for logs and tests.
+
+Addresses are lowercased on write, and `customers` has a unique index on
+`lower(email)`, so casing cannot split one person across two accounts.
+
 ## Deploying
 
 Set in Vercel → Settings → Environment Variables:
@@ -231,6 +283,7 @@ Set in Vercel → Settings → Environment Variables:
 | `DB_POOLED`           | `true` in production — `DATABASE_URL` is behind PgBouncer   |
 | `ADMIN_EMAIL`         | Optional. Identity checked at sign-in; not a secret          |
 | `ADMIN_PASSWORD`      | **Required.** Long random string. Unset ⇒ nobody can sign in |
+| `OTP_SECRET`          | **Required** for customer sign-in. 32 random bytes, hex      |
 | `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs               |
 | `BLOB_READ_WRITE_TOKEN`| Vercel Blob. Injected automatically once the store is linked|
 
