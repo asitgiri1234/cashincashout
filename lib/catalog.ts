@@ -39,9 +39,66 @@ type Row = {
   variants: { sizeLabel: string; stock: number; position: number }[];
 };
 
+/**
+ * Last resort when a product has no photography anywhere. On-brand rather
+ * than a stock "no image" graphic: surface fill, hairline frame, diagonal
+ * cross, 4:5 to match the aspect boxes the cards and strips use.
+ */
+export const PLACEHOLDER_IMAGE = "/products/placeholder.png";
+
+/**
+ * Images for a product, through the fallback chain:
+ *
+ *   1. product_images rows, ordered by position
+ *   2. the hardcoded paths in lib/products.ts for the same slug
+ *   3. the placeholder
+ *
+ * Levels 2 and 3 exist because several call sites index `images[0]` without
+ * guarding it. An empty array does not throw — next/image renders `src=""`,
+ * which browsers resolve against the current URL and re-request the whole
+ * page — so the failure is a broken tile plus a wasted document fetch, and
+ * it is silent apart from a console warning. Returning at least one image
+ * makes that state unreachable.
+ */
+function resolveImages(
+  slug: string,
+  title: string,
+  rows: { url: string; alt: string; position: number }[],
+): { images: string[]; imageAlts: string[] } {
+  if (rows.length > 0) {
+    const ordered = [...rows].sort((a, b) => a.position - b.position);
+    return {
+      images: ordered.map((i) => i.url),
+      imageAlts: ordered.map((i) => i.alt),
+    };
+  }
+
+  const fromStatic = staticCatalogue.find((p) => p.slug === slug);
+  if (fromStatic && fromStatic.images.length > 0) {
+    console.warn(
+      `[catalog] "${slug}" has no product_images rows; falling back to the ` +
+        "hardcoded paths in lib/products.ts. Upload images at " +
+        `/admin/products to replace them.`,
+    );
+    return { images: fromStatic.images, imageAlts: fromStatic.imageAlts };
+  }
+
+  console.error(
+    `[catalog] "${slug}" has no images in the database and no entry in the ` +
+      "static catalogue. Serving the placeholder — this product is on the " +
+      "storefront with no photography.",
+  );
+  return {
+    images: [PLACEHOLDER_IMAGE],
+    // Explicit, so a screen reader is told there is no photograph rather
+    // than hearing the product title announced for a placeholder graphic.
+    imageAlts: [`${title} — no photograph available yet`],
+  };
+}
+
 function rowToProduct(row: Row): Product {
   const ordered = [...row.variants].sort((a, b) => a.position - b.position);
-  const orderedImages = [...row.images].sort((a, b) => a.position - b.position);
+  const { images, imageAlts } = resolveImages(row.slug, row.title, row.images);
   const sizes = ordered.map((v) => v.sizeLabel);
   const soldOut = ordered.filter((v) => v.stock <= 0).map((v) => v.sizeLabel);
 
@@ -64,11 +121,11 @@ function rowToProduct(row: Row): Product {
         return preferred;
       return sizes.find((s) => !soldOut.includes(s)) ?? sizes[0] ?? "";
     })(),
-    // Sorted once and split into two index-aligned arrays. The admin's alt
-    // text reaches the storefront through `imageAlts`; dropping it here is
-    // what previously made that field write-only.
-    images: orderedImages.map((i) => i.url),
-    imageAlts: orderedImages.map((i) => i.alt),
+    // Two index-aligned arrays, already through the fallback chain and
+    // guaranteed non-empty. The admin's alt text reaches the storefront via
+    // `imageAlts`; dropping it here is what once made that field write-only.
+    images,
+    imageAlts,
     description: row.description,
   };
 }
