@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { AccountLink } from "@/components/account-link";
 import { useCartStore, selectCount } from "@/lib/cart-store";
 import { useUiStore } from "@/lib/ui-store";
 
@@ -55,6 +56,9 @@ export function SiteHeader() {
         </Link>
 
         <div className="flex items-center gap-4 justify-self-end md:gap-6">
+          {/* Text only, matching the rest of this header. */}
+          <AccountLink />
+
           <button
             type="button"
             onClick={() => openSearch(true)}
