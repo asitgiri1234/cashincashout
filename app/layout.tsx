@@ -49,8 +49,30 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={fontVariables}>
-      <body className="text-text antialiased">{children}</body>
+    /*
+     * suppressHydrationWarning on <html> and <body> ONLY.
+     *
+     * Browser extensions write attributes onto these two elements before
+     * React hydrates — Bitdefender adds `bis_register`, others add markers
+     * like `data-cap-chrome-extension-installed` — and React then reports a
+     * mismatch against server HTML that was perfectly correct. This is the
+     * documented escape for that case.
+     *
+     * IT IS NOT A GENERAL FIX AND MUST NOT BE SPREAD FURTHER. The flag
+     * applies only to the element it is on, never to descendants, so it
+     * silences extension noise on the document shell while leaving every
+     * real mismatch inside the app still reported. Putting it on a component
+     * that renders actual content would hide genuine bugs — a server/client
+     * branch, an unseeded random value, a date formatted in the visitor's
+     * locale — which is exactly what this warning exists to catch.
+     *
+     * These two elements carry no dynamic content of ours, so there is
+     * nothing here for it to mask.
+     */
+    <html lang="en" className={fontVariables} suppressHydrationWarning>
+      <body className="text-text antialiased" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }
