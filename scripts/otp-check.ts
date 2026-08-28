@@ -2,6 +2,13 @@
  * End-to-end check of the OTP core.
  *
  *   npx tsx --env-file=.env.local scripts/otp-check.ts
+ *   npx tsx --env-file=.env.local scripts/otp-check.ts --send you@example.com
+ *
+ * With --send the assertion suite is skipped and one real code is issued and
+ * delivered to that address through the configured relay, so the template and
+ * the SMTP credentials can be checked against a live inbox. It is the only
+ * mode that writes a row for an address you actually own, so it cleans that
+ * one up too.
  *
  * Requests a code, prints it, verifies it, then asserts every way it is
  * supposed to fail: reuse, expiry, a wrong code, the attempt ceiling, the
@@ -36,6 +43,9 @@ import {
   verifyOtp,
 } from "../lib/auth/otp";
 import { MIN_SECONDS_BETWEEN } from "../lib/auth/rate-limit";
+import { readSmtpConfig, verifySmtpConnection } from "../lib/email/client";
+import { sendOtpEmail } from "../lib/email/send";
+import { renderOtpEmail } from "../lib/email/templates/otp-code";
 
 const DOMAIN = "@otp-check.invalid";
 const IP = "203.0.113.7"; // TEST-NET-3, reserved for documentation
@@ -76,6 +86,74 @@ async function cleanup() {
   }
   await db.delete(customers).where(like(customers.email, `%${DOMAIN}`));
   await db.delete(otpCodes).where(like(otpCodes.email, `%${DOMAIN}`));
+}
+
+/**
+ * Issue one real code and deliver it. Skips the assertion suite entirely —
+ * this is for eyeballing the template and proving the relay works, not for
+ * checking logic.
+ */
+async function sendMode(address: string) {
+  const cfg = readSmtpConfig();
+
+  console.log(`
+sending a real code to ${address}
+`);
+
+  if (!cfg) {
+    console.log("  SMTP_HOST is not set.");
+    console.log(
+      "  The development fallback prints the code instead of sending it,",
+    );
+    console.log(
+      "  and only when NODE_ENV=development. Run with NODE_ENV=development,",
+    );
+    console.log("  or configure SMTP — see README -> Sending email.");
+  } else {
+    console.log(`  relay:  ${cfg.host}:${cfg.port} secure=${cfg.secure}`);
+    console.log(`  from:   ${cfg.from}`);
+    console.log(`  auth:   ${cfg.user ? cfg.user : "(none)"}`);
+
+    const verified = await verifySmtpConnection();
+    verified.ok
+      ? ok(`connection and credentials accepted — ${verified.messageId}`)
+      : bad(`SMTP verify failed: ${verified.error}`);
+    if (!verified.ok) return;
+  }
+
+  const issued = await requestOtp(address, IP);
+  if (!issued.ok) {
+    bad(`could not issue a code: ${JSON.stringify(issued.error)}`);
+    return;
+  }
+  ok(`issued ${issued.code}, expires ${issued.expiresAt.toISOString()}`);
+
+  // Rendered here as well as inside sendOtpEmail, purely to report what the
+  // recipient will see in their inbox list.
+  const rendered = renderOtpEmail(issued.code);
+  info(`subject: ${rendered.subject}`);
+  info(`html ${rendered.html.length}B, text ${rendered.text.length}B`);
+
+  const sent = await sendOtpEmail(address, issued.code);
+  if (sent.ok) {
+    ok(
+      sent.messageId === "dev-console"
+        ? "printed to the console (no relay configured, development only)"
+        : `sent — message id ${sent.messageId}`,
+    );
+  } else {
+    bad(`send failed [${sent.code}]: ${sent.error}`);
+  }
+
+  // Verify it, so the address is not left holding a live code.
+  const verifiedCode = await verifyOtp(address, issued.code);
+  verifiedCode.ok
+    ? ok("the emailed code verifies")
+    : bad(`the emailed code did not verify: ${JSON.stringify(verifiedCode.error)}`);
+
+  await db.delete(otpCodes).where(eq(otpCodes.email, normaliseEmail(address)));
+  info("removed the code row for that address");
+  info("the customer row was left in place — it is a real account now");
 }
 
 async function main() {
@@ -316,9 +394,17 @@ async function main() {
     : bad(`${gapRows.n} rows written for the gap-test address`);
 }
 
-main()
+const sendIndex = process.argv.indexOf("--send");
+const sendTo = sendIndex !== -1 ? process.argv[sendIndex + 1] : undefined;
+
+if (sendIndex !== -1 && !sendTo) {
+  console.error("--send needs an address: --send you@example.com");
+  process.exit(1);
+}
+
+(sendTo ? sendMode(sendTo) : main())
   .then(async () => {
-    await cleanup();
+    if (!sendTo) await cleanup();
     console.log(
       failures === 0
         ? "\nall assertions passed.\n"
@@ -328,6 +414,6 @@ main()
   })
   .catch(async (err) => {
     console.error(err);
-    await cleanup().catch(() => {});
+    if (!sendTo) await cleanup().catch(() => {});
     process.exit(1);
   });

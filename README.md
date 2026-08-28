@@ -272,6 +272,90 @@ form. Every verification failure already shares one message; the distinct
 Addresses are lowercased on write, and `customers` has a unique index on
 `lower(email)`, so casing cannot split one person across two accounts.
 
+## Sending email
+
+Plain SMTP through Nodemailer, deliberately — **no provider SDK**. Every relay
+worth using speaks SMTP, so the sending service is six environment variables
+rather than a dependency and a rewrite. The cost is giving up provider
+niceties (webhooks, template APIs, analytics), which is a fair trade for a
+store sending one kind of message.
+
+| Path | Role |
+| ---- | ---- |
+| `lib/email/client.ts` | One pooled transport, reused. Never throws into a request |
+| `lib/email/send.ts` | Application helpers, and the development escape hatch |
+| `lib/email/templates/` | Shared dark layout plus the one-time-code message |
+
+`sendEmail` returns a typed result and **never throws**. A relay that is slow,
+rate limited or down must not turn a sign-in into a 500, so the caller decides
+what a failure means. Three timeouts are set — connect, greeting, socket —
+because a hung relay otherwise holds a request open until the platform kills
+it, which on serverless is billed time and a spinning user.
+
+### Local development with Gmail
+
+Leave `SMTP_HOST` unset and codes print to the server console instead of
+sending — enough to exercise sign-in with no relay at all. To send real mail:
+
+1. Turn on 2-Step Verification on the Google account.
+2. Create an **app password** at
+   [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords).
+   Your normal account password will not work.
+3. Put it in `.env.local` (strip the spaces Google shows):
+
+```ini
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER="you@gmail.com"
+SMTP_PASS="app-password-with-no-spaces"
+EMAIL_FROM="CICO <you@gmail.com>"
+```
+
+```bash
+npx tsx --env-file=.env.local scripts/otp-check.ts --send you@example.com
+```
+
+That verifies the credentials, issues one real code, renders the template and
+delivers it, so the message can be checked in an actual inbox.
+
+Gmail is for development only. It caps at roughly 500 messages a day, rewrites
+`From` to the authenticated account, and is not a transactional relay.
+
+### Production needs a real relay, and DNS
+
+> **Mail sent from a domain that has not authorised the sender will land in
+> spam, or be rejected outright.** This is not a maybe. Gmail and Outlook have
+> required authentication for bulk senders since 2024, and a sign-in code that
+> arrives in the junk folder is a sign-in that fails.
+
+Use **Amazon SES** or **Brevo** — both speak SMTP, so only the variables
+change. Then publish DNS on `cashincashout.in`:
+
+| Record | Purpose |
+| ------ | ------- |
+| **SPF** (`TXT`) | Names the hosts allowed to send as the domain. One SPF record only — multiple is a permanent failure |
+| **DKIM** (`CNAME`/`TXT`) | The provider's signing keys, so each message is cryptographically attributable |
+| **DMARC** (`TXT`) | What receivers should do when the first two fail. Start at `p=none` and read the reports before tightening |
+
+`EMAIL_FROM` must be an address at the domain you authorised. Sending as
+`@cashincashout.in` while authenticated as a Gmail account fails DMARC and is
+exactly the case filters are built to catch.
+
+Verify with the provider's own console first, then send yourself a message and
+check **Show original** in Gmail: SPF, DKIM and DMARC should all read `PASS`.
+
+### The wordmark is white ink
+
+Email clients cannot load `/public`, so the logo is hosted on Vercel Blob at
+an absolute URL under `brand/` — outside `products/`, so the orphan sweep in
+`scripts/blob-orphans.ts` never touches it.
+
+It is **white on transparent**, so the layout paints its dark background on
+the containing `<table>` as both a `bgcolor` attribute and a style. Several
+clients strip body styling, and without that belt-and-braces the wordmark
+would render white-on-white and vanish.
+
 ## Deploying
 
 Set in Vercel → Settings → Environment Variables:
@@ -284,6 +368,7 @@ Set in Vercel → Settings → Environment Variables:
 | `ADMIN_EMAIL`         | Optional. Identity checked at sign-in; not a secret          |
 | `ADMIN_PASSWORD`      | **Required.** Long random string. Unset ⇒ nobody can sign in |
 | `OTP_SECRET`          | **Required** for customer sign-in. 32 random bytes, hex      |
+| `SMTP_HOST` … `EMAIL_FROM` | The mail relay. Unset ⇒ nothing sends in production     |
 | `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs               |
 | `BLOB_READ_WRITE_TOKEN`| Vercel Blob. Injected automatically once the store is linked|
 
