@@ -35,13 +35,15 @@ import { customers, customerSessions, otpCodes } from "../lib/db/schema";
 import {
   MAX_OTP_ATTEMPTS,
   OTP_DIGITS,
-  createCustomerSession,
-  destroyCustomerSession,
   normaliseEmail,
   requestOtp,
-  verifyCustomerSession,
   verifyOtp,
 } from "../lib/auth/otp";
+import {
+  issueSessionToken,
+  resolveSessionToken,
+  revokeSessionToken,
+} from "../lib/auth/session";
 import { MIN_SECONDS_BETWEEN } from "../lib/auth/rate-limit";
 import { readSmtpConfig, verifySmtpConnection } from "../lib/email/client";
 import { sendOtpEmail } from "../lib/email/send";
@@ -356,7 +358,7 @@ async function main() {
 
   /* ================= 13. sessions ================= */
   console.log("\n13. session round trip");
-  const session = await createCustomerSession(good.customer.id, "otp-check");
+  const session = await issueSessionToken(good.customer.id, "otp-check");
   if (!session) {
     bad("session creation returned null");
   } else {
@@ -368,17 +370,17 @@ async function main() {
       ? ok("session token is not stored in plaintext")
       : bad("PLAINTEXT SESSION TOKEN FOUND IN THE DATABASE");
 
-    const resolved = await verifyCustomerSession(session.token);
+    const resolved = await resolveSessionToken(session.token);
     resolved?.customerId === good.customer.id
       ? ok("token resolves to the right customer")
       : bad(`token resolved to ${JSON.stringify(resolved)}`);
 
-    (await verifyCustomerSession("not-a-real-token")) === null
+    (await resolveSessionToken("not-a-real-token")) === null
       ? ok("a bogus token resolves to null")
       : bad("a bogus token was accepted");
 
-    await destroyCustomerSession(session.token);
-    (await verifyCustomerSession(session.token)) === null
+    await revokeSessionToken(session.token);
+    (await resolveSessionToken(session.token)) === null
       ? ok("signing out invalidates the token")
       : bad("token still valid after sign-out");
   }

@@ -42,6 +42,7 @@ npm run db:studio     # browse the data
 | `scripts/seed.ts`     | Ports the hardcoded catalogue into the database    |
 | `scripts/db-check.ts` | Read-back sanity check                             |
 | `scripts/otp-check.ts`| End-to-end check of customer sign-in               |
+| `scripts/session-check.ts` | Customer sessions, and the admin separation guarantee |
 
 ### Three rules the schema is built around
 
@@ -263,14 +264,75 @@ it writes, and either turns a login form into a tool for testing whether an
 address shops here. The customer row is created on successful *verification*
 instead, so the request path is identical for a stranger and a regular.
 
-The corollary is for callers: **return the same response to the user whether
-`requestOtp` succeeded or was rate limited.** The structured failures it
-returns are for logs and server decisions, not for rendering next to the
-form. Every verification failure already shares one message; the distinct
-`code` values are for logs and tests.
+What must stay indistinguishable is **whether an account exists** — and it
+does, because that table is never queried. Rate-limit failures *are* safe to
+show: they depend only on request history for an address, which the person
+asking has just caused themselves, and reveal nothing about who shops here.
+Telling someone to wait sixty seconds beats silently doing nothing. Every
+*verification* failure still shares one message; the distinct `code` values
+are for logs and tests.
 
 Addresses are lowercased on write, and `customers` has a unique index on
 `lower(email)`, so casing cannot split one person across two accounts.
+
+### Customer sessions
+
+`lib/auth/session.ts`. A random token in a `cico_customer` cookie; only its
+HMAC is stored, so a database compromise cannot be turned into a live
+session. 30 days, with a rolling refresh — a session used at least once a day
+is extended back to the full window, so an active customer is never signed
+out mid-use.
+
+```bash
+npx tsx --env-file=.env.local scripts/session-check.ts   # needs the app running
+```
+
+| Function | |
+| -------- | -- |
+| `createSession` | Signs in. Server Action or Route Handler only — Next forbids cookie writes while rendering |
+| `getSession` | The current customer or `null`. Safe anywhere; never throws on expiry |
+| `requireCustomer` | The customer, or redirects to `/login` with a validated return target |
+| `destroySession` | Sign out of this device |
+| `destroyAllSessions` | Sign out everywhere |
+
+#### Customer sessions and admin sessions share nothing
+
+Not by convention — structurally, so it cannot be broken by forgetting a
+check. They are different *kinds* of credential:
+
+| | Admin | Customer |
+| --- | ----- | -------- |
+| Cookie | `cico_admin` | `cico_customer` |
+| Secret | `ADMIN_PASSWORD` | `CUSTOMER_SESSION_SECRET` |
+| Form | Stateless HMAC of a fixed string | Random token, meaningless without a row |
+| Verified by | `isValidSession` (recompute + compare) | `resolveSessionToken` (database lookup) |
+
+An admin cookie presented as a customer session finds no row and resolves to
+`null`. A customer token presented as an admin cookie fails an HMAC
+comparison that cannot be satisfied without `ADMIN_PASSWORD`. Neither
+rejection depends on remembering to write a guard.
+
+`lib/admin-auth.ts` must never import `lib/auth/session.ts`, and vice versa.
+A shared helper would become the single place where the separation could be
+broken by accident.
+
+`scripts/session-check.ts` asserts this over real HTTP against a running
+server, including the obvious attack of renaming the cookie.
+
+#### The shop is not behind a login
+
+Middleware annotates requests with whether a customer cookie is present and
+**blocks nothing** outside `/admin`. Browsing, search, the cart and guest
+checkout all stay open to logged-out visitors — the schema is guest-first for
+exactly that reason.
+
+That header is a hint, never a verdict: middleware runs on the edge where the
+Postgres driver does not, so the session cannot be verified there. It means
+"a cookie was sent", not "this visitor is signed in". Its only legitimate use
+is letting a layout skip a database round trip when there is definitely no
+session to find; anything making a trust decision on it is a vulnerability.
+Any inbound value is stripped before it is set, so a client cannot supply its
+own.
 
 ## Sending email
 
@@ -368,6 +430,7 @@ Set in Vercel → Settings → Environment Variables:
 | `ADMIN_EMAIL`         | Optional. Identity checked at sign-in; not a secret          |
 | `ADMIN_PASSWORD`      | **Required.** Long random string. Unset ⇒ nobody can sign in |
 | `OTP_SECRET`          | **Required** for customer sign-in. 32 random bytes, hex      |
+| `CUSTOMER_SESSION_SECRET` | **Required.** A *different* 32 random bytes, hex         |
 | `SMTP_HOST` … `EMAIL_FROM` | The mail relay. Unset ⇒ nothing sends in production     |
 | `NEXT_PUBLIC_SITE_URL`| Deployed origin, for absolute Open Graph URLs               |
 | `BLOB_READ_WRITE_TOKEN`| Vercel Blob. Injected automatically once the store is linked|

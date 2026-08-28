@@ -1,8 +1,8 @@
 import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { customers, customerSessions, otpCodes } from "../db/schema";
-import { hmacHex, randomNumericCode, randomToken, safeEqual } from "./crypto";
+import { customers, otpCodes } from "../db/schema";
+import { hmacHex, randomNumericCode, safeEqual } from "./crypto";
 import { checkOtpRateLimits, type RateLimitRejection } from "./rate-limit";
 
 /**
@@ -41,9 +41,6 @@ export const OTP_TTL_MINUTES = 10;
 export const MAX_OTP_ATTEMPTS = 5;
 
 export const OTP_DIGITS = 6;
-
-/** Session lifetime once a code is redeemed. */
-export const SESSION_TTL_DAYS = 30;
 
 /**
  * The HMAC key. REQUIRED — there is no fallback, and that is deliberate.
@@ -152,11 +149,12 @@ const codeMessage = (email: string, code: string) => `otp:${email}:${code}`;
  *
  * Returns the plaintext to the caller to send. Nothing else ever sees it.
  *
- * The caller MUST return the same response to the user whether this succeeds
- * or is rate limited — the failure shapes here are for logs and for the
- * server's own decisions, not for display next to the login form. Showing
- * "too many codes for this address" to whoever typed it is a small
- * enumeration leak in itself.
+ * WHAT MUST STAY INDISTINGUISHABLE is whether an account exists — and it does,
+ * because this never queries the customers table. The rate-limit failures
+ * below are safe to show: they depend only on request history for an address,
+ * which the person asking has just caused themselves, and reveal nothing
+ * about whether anyone shops here. Telling someone to wait sixty seconds is
+ * better than silently doing nothing.
  */
 export async function requestOtp(
   rawEmail: string,
@@ -377,99 +375,27 @@ export async function verifyOtp(
 }
 
 /* -------------------------------------------------------------------------
-   SESSIONS
+   HOUSEKEEPING
    ------------------------------------------------------------------------- */
 
 /**
- * Start a session for a verified customer.
- *
- * Returns the plaintext token for the cookie; only its hash is stored, so a
- * database compromise cannot be turned into a live session. Unkeyed SHA-256
- * would be adequate for a 256-bit random token — there is nothing to brute
- * force — but the same HMAC is used for consistency and to keep every stored
- * credential dependent on OTP_SECRET.
- */
-export async function createCustomerSession(
-  customerId: string,
-  userAgent: string | null,
-): Promise<{ token: string; expiresAt: Date } | null> {
-  if (!OTP_SECRET) return null;
-
-  const token = randomToken(32);
-  const tokenHash = await hmacHex(OTP_SECRET, `session:${token}`);
-  const expiresAt = new Date(
-    Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000,
-  );
-
-  await db
-    .insert(customerSessions)
-    .values({ customerId, tokenHash, expiresAt, userAgent });
-
-  return { token, expiresAt };
-}
-
-/** Resolve a session cookie to a customer, or null. Touches last_seen_at. */
-export async function verifyCustomerSession(
-  token: string | undefined | null,
-): Promise<{ customerId: string; email: string } | null> {
-  if (!OTP_SECRET || !token) return null;
-
-  const tokenHash = await hmacHex(OTP_SECRET, `session:${token}`);
-
-  const [row] = await db
-    .select({
-      id: customerSessions.id,
-      customerId: customerSessions.customerId,
-      expiresAt: customerSessions.expiresAt,
-      email: customers.email,
-    })
-    .from(customerSessions)
-    .innerJoin(customers, eq(customers.id, customerSessions.customerId))
-    .where(eq(customerSessions.tokenHash, tokenHash))
-    .limit(1);
-
-  if (!row) return null;
-
-  if (row.expiresAt.getTime() <= Date.now()) {
-    await db.delete(customerSessions).where(eq(customerSessions.id, row.id));
-    return null;
-  }
-
-  await db
-    .update(customerSessions)
-    .set({ lastSeenAt: new Date() })
-    .where(eq(customerSessions.id, row.id));
-
-  return { customerId: row.customerId, email: row.email };
-}
-
-/** Sign out one session. Idempotent. */
-export async function destroyCustomerSession(token: string): Promise<void> {
-  if (!OTP_SECRET) return;
-  const tokenHash = await hmacHex(OTP_SECRET, `session:${token}`);
-  await db.delete(customerSessions).where(eq(customerSessions.tokenHash, tokenHash));
-}
-
-/**
- * Housekeeping: drop expired codes and sessions.
+ * Drop expired one-time codes.
  *
  * Nothing calls this automatically. Codes stay readable for a while on
  * purpose — the rate limiter counts them within the last hour, so deleting
  * eagerly would hand back quota early.
+ *
+ * SESSIONS ARE NOT HANDLED HERE. They live in lib/auth/session.ts, under a
+ * different secret, and are pruned by pruneExpiredSessions there. Keeping the
+ * two apart is the point: nothing in this file should be able to mint, read
+ * or destroy a customer session.
  */
-export async function pruneExpiredAuthRows(olderThan = new Date()): Promise<{
-  codes: number;
-  sessions: number;
-}> {
-  const codes = await db
+export async function pruneExpiredOtpCodes(
+  olderThan = new Date(),
+): Promise<number> {
+  const removed = await db
     .delete(otpCodes)
     .where(lte(otpCodes.expiresAt, olderThan))
     .returning({ id: otpCodes.id });
-
-  const sessions = await db
-    .delete(customerSessions)
-    .where(lte(customerSessions.expiresAt, olderThan))
-    .returning({ id: customerSessions.id });
-
-  return { codes: codes.length, sessions: sessions.length };
+  return removed.length;
 }
